@@ -1,0 +1,2 @@
+Invoking command in '/home/gino/ws_mobile/build/mobile_robot': /usr/bin/cmake --build /home/gino/ws_mobile/build/mobile_robot -- -j8 -l8
+Invoked command in '/home/gino/ws_mobile/build/mobile_robot' returned '2': /usr/bin/cmake --build /home/gino/ws_mobile/build/mobile_robot -- -j8 -l8
