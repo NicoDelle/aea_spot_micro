@@ -1,4 +1,0 @@
-Invoking command in '/home/gino/ws_mobile/build/mobile_robot': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --build /home/gino/ws_mobile/build/mobile_robot -- -j8 -l8
-Invoked command in '/home/gino/ws_mobile/build/mobile_robot' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --build /home/gino/ws_mobile/build/mobile_robot -- -j8 -l8
-Invoking command in '/home/gino/ws_mobile/build/mobile_robot': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --install /home/gino/ws_mobile/build/mobile_robot
-Invoked command in '/home/gino/ws_mobile/build/mobile_robot' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --install /home/gino/ws_mobile/build/mobile_robot
