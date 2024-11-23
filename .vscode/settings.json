@@ -5,5 +5,5 @@
     "python.analysis.extraPaths": [
         "/opt/ros/jazzy/lib/python3.12/site-packages"
     ],
-    "cmake.sourceDirectory": "/home/anthor/Projects/ROS2/aea_spot_micro/ws_mobile/src/mobile_robot"
+    "cmake.sourceDirectory": "/home/anthor/Projects/ROS2/aea_spot_micro/spot_micro/src/mobile_robot"
 }
