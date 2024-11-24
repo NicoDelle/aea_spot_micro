@@ -1,4 +1,5 @@
 spot_micro/build/
 spot_micro/log/
+spot_micro/install/
 .vscode/
 venv/
