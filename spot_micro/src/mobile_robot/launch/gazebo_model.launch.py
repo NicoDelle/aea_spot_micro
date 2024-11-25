@@ -11,38 +11,38 @@ import xacro
 def generate_launch_description():
 
     # this name has to match the robot name in the Xacro file 
-    robotXacroName='differential_drive_robot'
+    robot_name_in_xacro='differential_drive_robot'
     
     # this is the name of our package, at the same time this is the name of the # folder that will be used to define the paths
-    namePackage = 'mobile_robot'
+    pakage_name = 'mobile_robot'
 
     #this is a relative path to the xacro file defining the model 
-    modelFileRelativePath = 'models/spotmicroai.xacro' 
+    relative_path_model_xacro = 'models/spotmicroai.xacro' 
     
     # uncom this if you want to define your own empty world model # however, then you have to create empty world.world
     #this is a relative path to the Gazebo world file # worldFileRelativePath = 'model/empty_world.world'
     
     # this is the absolute path to the model 
-    pathModelFile = os.path.join(get_package_share_directory(namePackage), modelFileRelativePath)
+    path_model_xacro = os.path.join(get_package_share_directory(pakage_name), relative_path_model_xacro)
     # uncomment this if you are using your own world model
     # this is the absolute path to the world model
 
     #get the robot description from the xacro model file
-    robotDescription = xacro.process_file(pathModelFile).toxml()
+    robot_description = xacro.process_file(path_model_xacro).toxml()
 
     #launch file from the gazebo_ros package
-    gazebo_rosPackageLaunch = PythonLaunchDescriptionSource(os.path.join(get_package_share_directory('ros_gz_sim'),
+    gazebo_ros_pakage_launch = PythonLaunchDescriptionSource(os.path.join(get_package_share_directory('ros_gz_sim'),
                                                                         'launch', 'gz_sim.launch.py'))
 
     #launch description: this is if you are using an empty world model
-    gazeboLaunch = IncludeLaunchDescription(gazebo_rosPackageLaunch, launch_arguments = {'gz_args': ['-r -v -v4 empty.sdf'], 'on_exit_shutdown': 'true'}.items())
+    gazebo_launch = IncludeLaunchDescription(gazebo_ros_pakage_launch, launch_arguments = {'gz_args': ['-r -v -v4 empty.sdf'], 'on_exit_shutdown': 'true'}.items())
     
     # Gazebo node
-    spawnModelNodeGazebo = Node(
+    node_spawn_model_gazebo = Node(
         package='ros_gz_sim',
         executable='create',
         arguments=[
-            '-name', robotXacroName,
+            '-name', robot_name_in_xacro,
             '-topic', 'robot_description',
             '-x', '1.0',  # Initial x position
             '-y', '2.0',  # Initial y position
@@ -56,17 +56,17 @@ def generate_launch_description():
 
 
     #Robot state publisher node
-    nodeRobotStatePublisher = Node(
+    node_robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         output='screen',
-        parameters=[{'robot_description': robotDescription,
+        parameters=[{'robot_description': robot_description,
         'use_sim_time':True}]
     )
 
     #this is very important so we can control the robot from ROS2
     bridge_params = os.path.join(
-    get_package_share_directory(namePackage),
+    get_package_share_directory(pakage_name),
     'parameters',
     'bridge_parameters.yaml'
     )
@@ -87,11 +87,11 @@ def generate_launch_description():
     launchDescriptionObject = LaunchDescription()
 
     # we add gazeboLaunch
-    launchDescriptionObject.add_action(gazeboLaunch)
+    launchDescriptionObject.add_action(gazebo_launch)
 
     #we add the two nodes
-    launchDescriptionObject.add_action(spawnModelNodeGazebo)
-    launchDescriptionObject.add_action(nodeRobotStatePublisher) 
+    launchDescriptionObject.add_action(node_spawn_model_gazebo)
+    launchDescriptionObject.add_action(node_robot_state_publisher) 
     launchDescriptionObject.add_action(start_gazebo_ros_bridge_cmd)
 
 
