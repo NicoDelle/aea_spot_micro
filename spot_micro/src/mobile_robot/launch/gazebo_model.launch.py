@@ -37,16 +37,23 @@ def generate_launch_description():
     #launch description: this is if you are using an empty world model
     gazeboLaunch = IncludeLaunchDescription(gazebo_rosPackageLaunch, launch_arguments = {'gz_args': ['-r -v -v4 empty.sdf'], 'on_exit_shutdown': 'true'}.items())
     
-    #Gazebo node
+    # Gazebo node
     spawnModelNodeGazebo = Node(
         package='ros_gz_sim',
         executable='create',
-        arguments = [
+        arguments=[
             '-name', robotXacroName,
-            '-topic', 'robot_description'
-        ],    
+            '-topic', 'robot_description',
+            '-x', '1.0',  # Initial x position
+            '-y', '2.0',  # Initial y position
+            '-z', '0.5',  # Initial z position (height from the ground)
+            '-R', '0.0',  # Initial roll (rotation around x-axis)
+            '-P', '0.0',  # Initial pitch (rotation around y-axis)
+            '-Y', '0.0'  # Initial yaw (rotation around z-axis, in radians)
+        ],
         output='screen',
     )
+
 
     #Robot state publisher node
     nodeRobotStatePublisher = Node(
