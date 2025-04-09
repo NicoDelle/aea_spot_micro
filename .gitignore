@@ -4,3 +4,4 @@ spot_micro/install/
 .vscode/
 spot_micro/.vscode/
 venv/
+.venv/
