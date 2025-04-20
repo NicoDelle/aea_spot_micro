@@ -14,12 +14,16 @@ class SpotmicroEnv(gym.Env):
 
         self._step_counter = 0
         self._robot_id = None
+        self._plane_id = None
         self._motor_joints_id = []
         self._joint_history = deque(maxlen=5)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
         self.use_gui = use_gui
         self._time_step = 1/240.
+
+        self._tilt_step = None #Keep track of where the plane is at (only needed in the tilting plane simulation)
+        self._tilt_phase = None
 
         #Declaration of observation and action spaces
         self.observation_space = gym.spaces.Box(
@@ -46,11 +50,19 @@ class SpotmicroEnv(gym.Env):
         self._target_state = {
             "min_height": 0.10, #meters?
         } 
-
+    
+    def close(self):
+        """
+        Method exposed and used by SB3.
+        Clean up the simulation.
+        """
+        if self.physics_client is not None:
+            pybullet.disconnect(self.physics_client)
+            self.physics_client = None
 
     def reset(self, seed: int |None = None, options: dict | None = None) -> tuple[gym.spaces.Box, dict]:
         """
-        Method to call before starting the simulation.
+        Method exposed and called by SB3 before starting each episode.
         Sets the all parameters and puts the agent in place
         """
         
@@ -60,6 +72,9 @@ class SpotmicroEnv(gym.Env):
         self._agent_state["base_orientation"] = pybullet.getQuaternionFromEuler([0,0,0])
         self._agent_state["linear_velocity"] = 0.0
         self._agent_state["angular_velocity"] = 0.0
+
+        self._tilt_step = 0
+        self._tilt_phase = np.random.uniform(0, 2 * np.pi)
 
         self._joint_history.clear()
         dummy_joint_state = [0.0] * 24
@@ -76,12 +91,18 @@ class SpotmicroEnv(gym.Env):
 
         #load robot URDF here
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
-        pybullet.loadURDF("plane.urdf", physicsClientId=self.physics_client)
+        self._plane_id = pybullet.loadURDF(
+            "plane.urdf", 
+            basePosition = [0,0,0],
+            baseOrientation = pybullet.getQuaternionFromEuler([0,0,0]),
+            physicsClientId=self.physics_client
+        )
+        
         self._robot_id = pybullet.loadURDF(
             "spotmicroai.urdf",
-            basePosition=self._agent_state["base_position"],
-            baseOrientation=self._agent_state["base_orientation"],
-            physicsClientId=self.physics_client
+            basePosition = self._agent_state["base_position"],
+            baseOrientation = self._agent_state["base_orientation"],
+            physicsClientId = self.physics_client
         )
 
         # Builld it oonce and make it immutable
@@ -105,7 +126,7 @@ class SpotmicroEnv(gym.Env):
 
     def step(self, action: np.ndarray) -> tuple[gym.spaces.Box, float, bool, bool, dict]:
         """
-        Execute one time step within the environment.
+        Method exposed and used bby SB3 to execute one time step within the environment.
 
         Args:
             action (gym.spaces.Box): The action to take in the environment.
@@ -146,6 +167,8 @@ class SpotmicroEnv(gym.Env):
                 controlMode = pybullet.POSITION_CONTROL,
                 targetPosition = action[i]
             ) #can also set maxTorque, positionGain, velocityGain (tunable)
+        
+        self._tilt_plane()
         pybullet.stepSimulation()
 
         self._update_agent_state()
@@ -268,6 +291,28 @@ class SpotmicroEnv(gym.Env):
             "episode_step": self._step_counter
         }
 
+    def _tilt_plane(self):
+        """
+        Smoothly tilts the plane in one direction
+        """
+
+        self._tilt_step += 1
+
+        freq = 0.01
+        max_angle = np.radians(6)
+
+        tilt_x = max_angle * np.sin(freq * self._tilt_step + self._tilt_phase)
+        tilt_y = max_angle * np.cos(freq * self._tilt_step + self._tilt_phase)
+
+        quat = pybullet.getQuaternionFromEuler([tilt_x, tilt_y, 0])
+
+        pybullet.resetBasePositionAndOrientation(
+            self._plane_id,
+            posObj=[0, 0, 0],
+            ornObj=quat,
+            physicsClientId=self.physics_client
+        )
+
     #@TODO: implement a well thought reward function
     def _calculate_reward(self, action: np.ndarray) -> float:
         """
@@ -281,11 +326,3 @@ class SpotmicroEnv(gym.Env):
         height_bonus = max(0.0, height - 0.15)  # Don't reward when falling
 
         return height_bonus + uprightness
-
-    def close(self):
-        """
-        Clean up the simulation.
-        """
-        if self.physics_client is not None:
-            pybullet.disconnect(self.physics_client)
-            self.physics_client = None
