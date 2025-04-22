@@ -16,6 +16,7 @@ class SpotmicroEnv(gym.Env):
         self._robot_id = None
         self._plane_id = None
         self._motor_joints_id = []
+        self._foot_link_ids = [5, 10, 15, 20] # <- hardocded cause it might be temporary
         self._joint_history = deque(maxlen=5)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
@@ -97,6 +98,16 @@ class SpotmicroEnv(gym.Env):
             baseOrientation = pybullet.getQuaternionFromEuler([0,0,0]),
             physicsClientId=self.physics_client
         )
+
+        pybullet.changeDynamics(
+            bodyUniqueId=self._plane_id,
+            linkIndex=-1,
+            lateralFriction=1.0,           # <- good default
+            spinningFriction=0.0,
+            rollingFriction=0.0,
+            restitution=0.0,
+            physicsClientId=self.physics_client
+        )
         
         self._robot_id = pybullet.loadURDF(
             "spotmicroai.urdf",
@@ -114,6 +125,14 @@ class SpotmicroEnv(gym.Env):
                 if joint_type == pybullet.JOINT_REVOLUTE:
                     self._motor_joints_id.append(i)
         self._motor_joints_id = tuple(self._motor_joints_id)
+
+        for foot_link_id in self._foot_link_ids:
+            pybullet.changeDynamics(
+                self._robot_id,
+                linkIndex=foot_link_id,
+                lateralFriction=1.0,
+                physicsClientId=self.physics_client
+            )
 
         #this is just to let the physics stabilize? -> might need to remove this loop
         for _ in range(10):
@@ -324,5 +343,9 @@ class SpotmicroEnv(gym.Env):
         # Encourage upright posture
         uprightness = 1.0 - (abs(roll) + abs(pitch))
         height_bonus = max(0.0, height - 0.15)  # Don't reward when falling
+        
+        # Encourage staying close to the center
+        distance_penalty = np.sqrt(self._agent_state["base_position"][0] ** 2 + self._agent_state["base_position"][1] ** 2)
+        action_penalty = 0.001 * np.sum(np.square(action))
 
-        return height_bonus + uprightness
+        return height_bonus + uprightness - distance_penalty - action_penalty
