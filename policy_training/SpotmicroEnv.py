@@ -11,6 +11,7 @@ class SpotmicroEnv(gym.Env):
         self._OBS_SPACE_SIZE = 94
         self._ACT_SPACE_SIZE = 12
         self._MAX_EPISODE_LEN = 1000
+        self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
 
         self._step_counter = 0
         self._robot_id = None
@@ -22,9 +23,6 @@ class SpotmicroEnv(gym.Env):
         self.physics_client = None
         self.use_gui = use_gui
         self._time_step = 1/240.
-
-        self._tilt_step = None #Keep track of where the plane is at (only needed in the tilting plane simulation)
-        self._tilt_phase = None
 
         #Declaration of observation and action spaces
         self.observation_space = gym.spaces.Box(
@@ -69,7 +67,7 @@ class SpotmicroEnv(gym.Env):
         
         super().reset(seed=seed)
         self._step_counter = 0
-        self._agent_state["base_position"] = (0.0 , 0.0, 0.4)
+        self._agent_state["base_position"] = (0.0 , 0.0, 0.3)
         self._agent_state["base_orientation"] = pybullet.getQuaternionFromEuler([0,0,0])
         self._agent_state["linear_velocity"] = 0.0
         self._agent_state["angular_velocity"] = 0.0
@@ -187,7 +185,6 @@ class SpotmicroEnv(gym.Env):
                 targetPosition = action[i]
             ) #can also set maxTorque, positionGain, velocityGain (tunable)
         
-        self._tilt_plane()
         pybullet.stepSimulation()
 
         self._update_agent_state()
@@ -313,6 +310,7 @@ class SpotmicroEnv(gym.Env):
     def _tilt_plane(self):
         """
         Smoothly tilts the plane in one direction
+        Right now it's unused
         """
 
         self._tilt_step += 1
@@ -341,11 +339,16 @@ class SpotmicroEnv(gym.Env):
         roll, pitch, _ = pybullet.getEulerFromQuaternion(self._agent_state["base_orientation"])
 
         # Encourage upright posture
-        uprightness = 1.0 - (abs(roll) + abs(pitch))
+        uprightness = (abs(roll) + abs(pitch)) / np.radians(60)
         height_bonus = max(0.0, height - 0.15)  # Don't reward when falling
         
         # Encourage staying close to the center
-        distance_penalty = np.sqrt(self._agent_state["base_position"][0] ** 2 + self._agent_state["base_position"][1] ** 2)
-        action_penalty = 0.001 * np.sum(np.square(action))
+        action_penalty = 0.005 * np.linalg.norm(action)**2
+        fwd_reward = np.dot(self._agent_state["linear_velocity"], self._TARGET_DIRECTION)
 
-        return height_bonus + uprightness - distance_penalty - action_penalty
+        return (
+            1.00 * fwd_reward +
+            0.25 * height_bonus -
+            0.5 * uprightness -
+            action_penalty
+        )
