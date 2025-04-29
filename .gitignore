@@ -12,3 +12,4 @@ spotmicroai.urdf
 policy_training/logs
 *.zip
 ppo_*
+*.png
