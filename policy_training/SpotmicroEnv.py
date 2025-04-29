@@ -398,7 +398,7 @@ class SpotmicroEnv(gym.Env):
         uprightness = np.clip(uprightness, 0.0, 1.0)
         height_error = abs(base_height - self._TARGET_HEIGHT)
 
-        action_penalty = np.arctan(np.linalg.norm(action))
+        action_penalty = np.arctan(np.linalg.norm(action)) #might look into forces?. Penalyze also joint saturation
         penalty_scale = 1.0 - np.exp(-1e-6 * self._total_steps_counter)
 
         fwd_reward = np.dot(self._agent_state["linear_velocity"], self._TARGET_DIRECTION) / (np.linalg.norm(self._agent_state["linear_velocity"]) + 1e-8)
