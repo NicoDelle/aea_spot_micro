@@ -13,7 +13,7 @@ class SpotmicroEnv(gym.Env):
         self._ACT_SPACE_SIZE = 12
         self._MAX_EPISODE_LEN = 3000
         self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
-        self._TARGET_HEIGHT = 0.26
+        self._TARGET_HEIGHT = 0.235
         self._SURVIVAL_REWARD = 15.0
 
         self._step_counter = 0
@@ -22,7 +22,7 @@ class SpotmicroEnv(gym.Env):
         self._robot_id = None
         self._plane_id = None
         self._motor_joints_id = []
-        self._foot_link_ids = [5, 10, 15, 20] # <- hardocded cause it might be temporary
+        self._foot_link_ids = [5, 10, 15, 20] # <- hardocded cause it might be temporary, also for performance 
         self._joint_history = deque(maxlen=5)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
@@ -77,7 +77,7 @@ class SpotmicroEnv(gym.Env):
         
         super().reset(seed=seed)
         self._step_counter = 0
-        self._agent_state["base_position"] = (0.0 , 0.0, 0.3)
+        self._agent_state["base_position"] = (0.0 , 0.0, 0.255) #Height set specifically through trial and error
         self._agent_state["base_orientation"] = pybullet.getQuaternionFromEuler([0,0,0])
         self._agent_state["linear_velocity"] = 0.0
         self._agent_state["angular_velocity"] = 0.0
@@ -402,7 +402,6 @@ class SpotmicroEnv(gym.Env):
         penalty_scale = 1.0 - np.exp(-1e-6 * self._total_steps_counter)
 
         fwd_reward = np.dot(self._agent_state["linear_velocity"], self._TARGET_DIRECTION) / (np.linalg.norm(self._agent_state["linear_velocity"]) + 1e-8)
-
         
         # Gating conditions: must be upright and at good height
         is_standing = (0.20 <= base_height <= 0.26) and (abs(roll) < np.radians(30)) and (abs(pitch) < np.radians(30))
