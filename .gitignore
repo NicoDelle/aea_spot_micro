@@ -9,3 +9,6 @@ venv/
 ppo_spotmicroai.zip
 __pycache__
 spotmicroai.urdf
+policy_training/logs
+*.zip
+ppo_*
