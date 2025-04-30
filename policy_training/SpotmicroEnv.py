@@ -15,6 +15,8 @@ class SpotmicroEnv(gym.Env):
         self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
         self._TARGET_HEIGHT = 0.235
         self._SURVIVAL_REWARD = 15.0
+        self._SIM_FREQUENCY = 1/240
+        self._CONTROL_FREQUENCY = 60
 
         self._step_counter = 0
         self._total_steps_counter = 0
@@ -27,7 +29,6 @@ class SpotmicroEnv(gym.Env):
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
         self.use_gui = use_gui
-        self._time_step = 1/240
 
         self._episode_reward_info = None
 
@@ -98,7 +99,7 @@ class SpotmicroEnv(gym.Env):
 
         pybullet.resetSimulation(physicsClientId=self.physics_client)
         pybullet.setGravity(0, 0, -9.81, physicsClientId=self.physics_client)
-        pybullet.setTimeStep(self._time_step, physicsClientId=self.physics_client)
+        pybullet.setTimeStep(self._SIM_FREQUENCY, physicsClientId=self.physics_client)
 
         #load robot URDF here
         pybullet.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -168,8 +169,14 @@ class SpotmicroEnv(gym.Env):
                 - truncated (bool): Whether the episode was artificially terminated.
                 - info (dict): Contains auxiliary diagnostic information.
         """
-        
-        observation = self._step_simulation(action)
+        count = 0
+        if count == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY):
+            observation = self._step_simulation(action)
+            count = 0
+        else:
+            count += 1
+            observation = self._step_simulation(self._previous_action)
+
         reward, reward_info = self._calculate_reward(action)
         terminated = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
         truncated = self._is_terminated()
@@ -213,8 +220,7 @@ class SpotmicroEnv(gym.Env):
         Accepts an action and returns an observation
         """
 
-        self._step_counter += 1 #updates the step counter (used to check against timeouts)
-
+        
         # Execute the action in pybullet
         for i in range(len(self._motor_joints_id)):
             pybullet.setJointMotorControl2(
@@ -224,7 +230,8 @@ class SpotmicroEnv(gym.Env):
                 targetPosition = action[i]
             ) #can also set maxTorque, positionGain, velocityGain (tunable)
         
-        pybullet.stepSimulation()
+            self._step_counter += 1 #updates the step counter (used to check against timeouts)
+            pybullet.stepSimulation()
 
         self._update_agent_state()
         self._update_history()
@@ -416,11 +423,11 @@ class SpotmicroEnv(gym.Env):
             
         # Each reward component
         reward_dict = {
-            "fwd_reward": fwd_reward,
-            "height_penalty": -15 * height_error,
+            "fwd_reward": 10 * fwd_reward,
+            "height_penalty": 2 * height_error,
             "contact_reward": 0 * contact_reward,
-            "uprightness": 3 * uprightness,
-            "action_penalty": - 0.5 * penalty_scale * action_penalty
+            "uprightness": 0 * uprightness,
+            "action_penalty": - 0 * penalty_scale * action_penalty
         }
 
         total_reward = sum(reward_dict.values())
