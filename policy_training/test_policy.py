@@ -8,7 +8,7 @@ env = SpotmicroEnv(use_gui=True)
 obs, _ = env.reset()
 
 # Load your trained model
-model = PPO.load("ppo_walk600k.debug6")  # or path to your .zip
+model = PPO.load("ppo_walk10k.debug6")  # or path to your .zip
 
 # Run rollout
 for _ in range(3001):
@@ -20,6 +20,6 @@ for _ in range(3001):
         env.plot_reward_components()  # 👈 plot per episode
         obs, _ = env.reset()
     
-    time.sleep(1/240.)  # Match simulation step time for real-time playback
+    time.sleep(1/60.)  # Match simulation step time for real-time playback
 
 env.close()
