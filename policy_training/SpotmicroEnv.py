@@ -5,6 +5,18 @@ import gymnasium as gym
 from collections import deque
 import matplotlib.pyplot as plt
 
+class Joint:
+    def __init__(self, name: str, joint_id: int, joint_type: str, limits: tuple):
+        self.name = name
+        self.id = joint_id
+        self.limits = limits
+        self.mid = 0.5 * (self.limits[0] + self.limits[1])
+        self.range = 0.5 * (self.limits[1] - self.limits[0])
+        self.type = joint_type # shoulder, leg, foot
+    
+    def from_action_to_position(self, action: float) -> float:
+        return self.mid + self.range * action
+
 class SpotmicroEnv(gym.Env):
     def __init__(self, use_gui=False):
         super().__init__()
@@ -23,13 +35,13 @@ class SpotmicroEnv(gym.Env):
 
         self._robot_id = None
         self._plane_id = None
-        self._motor_joints_id = []
-        self._foot_link_ids = (5, 10, 15, 20) # <- hardocded cause it might be temporary, also for performance 
-        self._foot_joint_limits = (-0.1, 2.59)
-        self._shoulder_link_ids = (2, 7, 12, 17)
-        self._shoulder_joint_limits = (-0.548, 0.548)
-        self._leg_link_ids = (3, 8, 13, 18)
-        self._leg_joint_limits = (-2.666, 1.548)
+        self._motor_joints = None
+        self._foot_link_ids = (5, 10, 15, 20) # <- hardocded cause it might be temporary, also for performance
+        #self._foot_joint_limits = (-0.1, 2.59)
+        #self._shoulder_link_ids = (2, 7, 12, 17)
+        #self._shoulder_joint_limits = (-0.548, 0.548)
+        #self._leg_link_ids = (3, 8, 13, 18)
+        #self._leg_joint_limits = (-2.666, 1.548)
         self._joint_history = deque(maxlen=5)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
@@ -132,15 +144,20 @@ class SpotmicroEnv(gym.Env):
             physicsClientId = self.physics_client
         )
 
-        # Builld it oonce and make it immutable
-        if not isinstance(self._motor_joints_id, tuple):
+        # Builld it once and make it immutable
+        if self._motor_joints is None:
+            motor_joints = []
             for i in range(pybullet.getNumJoints(self._robot_id)):
                 joint_info = pybullet.getJointInfo(self._robot_id, i)
+                joint_name = joint_info[1].decode("utf-8")
                 joint_type = joint_info[2]
+                joint_limits = (joint_info[8], joint_info[9])
 
                 if joint_type == pybullet.JOINT_REVOLUTE:
-                    self._motor_joints_id.append(i)
-        self._motor_joints_id = tuple(self._motor_joints_id)
+                    joint_category = joint_name.split("_")[-1]
+                    motor_joints.append(Joint(joint_name, i, joint_category, joint_limits))
+
+            self._motor_joints = tuple(motor_joints)
 
         for foot_link_id in self._foot_link_ids:
             pybullet.changeDynamics(
@@ -225,15 +242,23 @@ class SpotmicroEnv(gym.Env):
         Accepts an action and returns an observation
         """
 
-        
         # Execute the action in pybullet
-        for i in range(len(self._motor_joints_id)):
+        for i, joint in enumerate(self._motor_joints):
             pybullet.setJointMotorControl2(
                 bodyUniqueId = self._robot_id,
-                jointIndex = self._motor_joints_id[i],
+                jointIndex = joint.id,
                 controlMode = pybullet.POSITION_CONTROL,
-                targetPosition = self._map_action_to_position(action[i], self._motor_joints_id[i])
-            ) #can also set maxTorque, positionGain, velocityGain (tunable)
+                targetPosition = joint.from_action_to_position(action[i])
+            )
+
+        #KEPT HERE TO DEBUG
+        #for i in range(len(self._motor_joints_id)):
+        #    pybullet.setJointMotorControl2(
+        #        bodyUniqueId = self._robot_id,
+        #        jointIndex = self._motor_joints_id[i],
+        #        controlMode = pybullet.POSITION_CONTROL,
+        #        targetPosition = self._map_action_to_position(action[i], self._motor_joints_id[i])
+        #    ) #can also set maxTorque, positionGain, velocityGain (tunable)
         
         self._step_counter += 1 #updates the step counter (used to check against timeouts)
         pybullet.stepSimulation()
@@ -262,10 +287,16 @@ class SpotmicroEnv(gym.Env):
         """
         positions = []
         velocities = []
-        for joint_id in self._motor_joints_id:
-            joint_state = pybullet.getJointState(self._robot_id, joint_id)
-            positions.append(joint_state[0])  # position
-            velocities.append(joint_state[1])  # velocity
+
+        for joint in self._motor_joints:
+            joint_state = pybullet.getJointState(self._robot_id, joint.id)
+            positions.append(joint_state[0])
+            velocities.append(joint_state[1])
+
+        #for joint_id in self._motor_joints_id:
+        #    joint_state = pybullet.getJointState(self._robot_id, joint_id)
+        #    positions.append(joint_state[0])  # position
+        #    velocities.append(joint_state[1])  # velocity
         
         return positions, velocities
     
