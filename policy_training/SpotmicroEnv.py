@@ -24,7 +24,12 @@ class SpotmicroEnv(gym.Env):
         self._robot_id = None
         self._plane_id = None
         self._motor_joints_id = []
-        self._foot_link_ids = [5, 10, 15, 20] # <- hardocded cause it might be temporary, also for performance 
+        self._foot_link_ids = (5, 10, 15, 20) # <- hardocded cause it might be temporary, also for performance 
+        self._foot_joint_limits = (-0.1, 2.59)
+        self._shoulder_link_ids = (2, 7, 12, 17)
+        self._shoulder_joint_limits = (-0.548, 0.548)
+        self._leg_link_ids = (3, 8, 13, 18)
+        self._leg_joint_limits = (-2.666, 1.548)
         self._joint_history = deque(maxlen=5)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
@@ -151,7 +156,7 @@ class SpotmicroEnv(gym.Env):
         
         self._update_agent_state()
         observation = self._get_observation()
-
+        
         return (observation, self._get_info())
 
     def step(self, action: np.ndarray) -> tuple[gym.spaces.Box, float, bool, bool, dict]:
@@ -227,16 +232,29 @@ class SpotmicroEnv(gym.Env):
                 bodyUniqueId = self._robot_id,
                 jointIndex = self._motor_joints_id[i],
                 controlMode = pybullet.POSITION_CONTROL,
-                targetPosition = action[i]
+                targetPosition = self._map_action_to_position(action[i], self._motor_joints_id[i])
             ) #can also set maxTorque, positionGain, velocityGain (tunable)
         
-            self._step_counter += 1 #updates the step counter (used to check against timeouts)
-            pybullet.stepSimulation()
+        self._step_counter += 1 #updates the step counter (used to check against timeouts)
+        pybullet.stepSimulation()
 
         self._update_agent_state()
         self._update_history()
 
         return self._get_observation()
+    
+    def _map_action_to_position(self, norm_action: np.ndarray, joint_index: int) -> np.ndarray:
+        if joint_index in self._foot_link_ids:
+            s = self._foot_joint_limits[1] + self._foot_joint_limits[0]
+            d = self._foot_joint_limits[1] - self._foot_joint_limits[0]
+        elif joint_index in self._leg_link_ids:
+            s = self._leg_joint_limits[1] + self._leg_joint_limits[0]
+            d = self._leg_joint_limits[1] - self._leg_joint_limits[0]
+        elif joint_index in self._shoulder_link_ids:
+            s = self._shoulder_joint_limits[1] + self._shoulder_joint_limits[0]
+            d = self._shoulder_joint_limits[1] - self._shoulder_joint_limits[0]
+        
+        return 0.5*s + 0.5*d*norm_action
     
     def _get_joint_states(self) -> tuple[list[float], list[float]]:
         """
@@ -405,7 +423,7 @@ class SpotmicroEnv(gym.Env):
         uprightness = np.clip(uprightness, 0.0, 1.0)
         height_error = abs(base_height - self._TARGET_HEIGHT)
 
-        action_penalty = np.arctan(np.linalg.norm(action)) #might look into forces?. Penalyze also joint saturation
+        action_penalty = np.arctan(np.linalg.norm(action)) #might look into forces?. Penalize also joint saturation
         penalty_scale = 1.0 - np.exp(-1e-6 * self._total_steps_counter)
 
         fwd_reward = np.dot(self._agent_state["linear_velocity"], self._TARGET_DIRECTION) / (np.linalg.norm(self._agent_state["linear_velocity"]) + 1e-8)
@@ -423,11 +441,11 @@ class SpotmicroEnv(gym.Env):
             
         # Each reward component
         reward_dict = {
-            "fwd_reward": 10 * fwd_reward,
-            "height_penalty": 2 * height_error,
+            "fwd_reward": 10 * (1 - penalty_scale) * fwd_reward,
+            "height_penalty": 3 * height_error,
             "contact_reward": 0 * contact_reward,
-            "uprightness": 0 * uprightness,
-            "action_penalty": - 0 * penalty_scale * action_penalty
+            "uprightness": 3 * uprightness,
+            "action_penalty": - 1 * penalty_scale * action_penalty
         }
 
         total_reward = sum(reward_dict.values())
