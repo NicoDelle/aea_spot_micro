@@ -236,7 +236,7 @@ class SpotmicroEnv(gym.Env):
         It should sinchronize the state of the agent in the simulation with the state recorded here!
         Accepts an action and returns an observation
         """
-
+        #@TODO: add max torque
         # Execute the action in pybullet
         for i, joint in enumerate(self._motor_joints):
             pybullet.setJointMotorControl2(
@@ -267,6 +267,14 @@ class SpotmicroEnv(gym.Env):
             velocities.append(joint_state[1])
 
         return positions, velocities
+
+    def _update_history(self):
+        hist = []
+        pos, vel = self._get_joint_states()
+        hist.extend(pos)
+        hist.extend(vel)
+
+        self._joint_history.appendleft(hist)
     
     def _get_ground_feet_contacts(self) -> set:
         contact_points = pybullet.getContactPoints(
@@ -305,15 +313,6 @@ class SpotmicroEnv(gym.Env):
         
         return gravity_base   
     
-    def _update_history(self):
-        hist = []
-        pos, vel = self._get_joint_states()
-        hist.extend(pos)
-        hist.extend(vel)
-
-        self._joint_history.appendleft(hist)
-
-
     def _get_observation(self) -> np.ndarray:
         """
         - 0-2: gravity vector
@@ -371,7 +370,6 @@ class SpotmicroEnv(gym.Env):
         else:
             return False
     
-    #@TODO: check all edge cases
     def _is_terminated(self) -> bool:
         """
         Function that returns wether an episode was terminated artificially or timed out
