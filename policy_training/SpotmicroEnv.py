@@ -13,6 +13,13 @@ class Joint:
         self.mid = 0.5 * (self.limits[0] + self.limits[1])
         self.range = 0.5 * (self.limits[1] - self.limits[0])
         self.type = joint_type # shoulder, leg, foot
+
+        if self.type == "shoulder":
+            self.max_torque = 2.0
+        elif self.type == "leg":
+            self.max_torque = 2.0
+        elif self.type == "foot":
+            self.max_torque = 2.0
     
     def from_action_to_position(self, action: float) -> float:
         return self.mid + self.range * action
@@ -243,7 +250,8 @@ class SpotmicroEnv(gym.Env):
                 bodyUniqueId = self._robot_id,
                 jointIndex = joint.id,
                 controlMode = pybullet.POSITION_CONTROL,
-                targetPosition = joint.from_action_to_position(action[i])
+                targetPosition = joint.from_action_to_position(action[i]),
+                force=joint.max_torque
             )
         
         self._step_counter += 1 #updates the step counter (used to check against timeouts)
