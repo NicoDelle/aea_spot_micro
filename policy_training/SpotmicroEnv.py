@@ -36,12 +36,6 @@ class SpotmicroEnv(gym.Env):
         self._robot_id = None
         self._plane_id = None
         self._motor_joints = None
-        self._foot_link_ids = (5, 10, 15, 20) # <- hardocded cause it might be temporary, also for performance
-        #self._foot_joint_limits = (-0.1, 2.59)
-        #self._shoulder_link_ids = (2, 7, 12, 17)
-        #self._shoulder_joint_limits = (-0.548, 0.548)
-        #self._leg_link_ids = (3, 8, 13, 18)
-        #self._leg_joint_limits = (-2.666, 1.548)
         self._joint_history = deque(maxlen=5)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
@@ -95,10 +89,11 @@ class SpotmicroEnv(gym.Env):
         
         super().reset(seed=seed)
         self._step_counter = 0
+        self._action_counter = 0
         self._agent_state["base_position"] = (0.0 , 0.0, 0.255) #Height set specifically through trial and error
         self._agent_state["base_orientation"] = pybullet.getQuaternionFromEuler([0,0,0])
-        self._agent_state["linear_velocity"] = 0.0
-        self._agent_state["angular_velocity"] = 0.0
+        self._agent_state["linear_velocity"] = np.zeros(3)
+        self._agent_state["angular_velocity"] = np.zeros(3)
 
         self._episode_reward_info = []
 
@@ -159,13 +154,14 @@ class SpotmicroEnv(gym.Env):
 
             self._motor_joints = tuple(motor_joints)
 
-        for foot_link_id in self._foot_link_ids:
-            pybullet.changeDynamics(
-                self._robot_id,
-                linkIndex=foot_link_id,
-                lateralFriction=1.0,
-                physicsClientId=self.physics_client
-            )
+        for joint in self._motor_joints:
+            if joint.type == "foot":
+                pybullet.changeDynamics(
+                    self._robot_id,
+                    linkIndex=joint.id,
+                    lateralFriction=1.0,
+                    physicsClientId=self.physics_client
+                )
 
         #this is just to let the physics stabilize? -> might need to remove this loop
         for _ in range(10):
@@ -191,12 +187,11 @@ class SpotmicroEnv(gym.Env):
                 - truncated (bool): Whether the episode was artificially terminated.
                 - info (dict): Contains auxiliary diagnostic information.
         """
-        count = 0
-        if count == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY):
+        if self._action_counter == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY):
             observation = self._step_simulation(action)
-            count = 0
+            self._action_counter = 0
         else:
-            count += 1
+            self._action_counter += 1
             observation = self._step_simulation(self._previous_action)
 
         reward, reward_info = self._calculate_reward(action)
@@ -250,15 +245,6 @@ class SpotmicroEnv(gym.Env):
                 controlMode = pybullet.POSITION_CONTROL,
                 targetPosition = joint.from_action_to_position(action[i])
             )
-
-        #KEPT HERE TO DEBUG
-        #for i in range(len(self._motor_joints_id)):
-        #    pybullet.setJointMotorControl2(
-        #        bodyUniqueId = self._robot_id,
-        #        jointIndex = self._motor_joints_id[i],
-        #        controlMode = pybullet.POSITION_CONTROL,
-        #        targetPosition = self._map_action_to_position(action[i], self._motor_joints_id[i])
-        #    ) #can also set maxTorque, positionGain, velocityGain (tunable)
         
         self._step_counter += 1 #updates the step counter (used to check against timeouts)
         pybullet.stepSimulation()
@@ -267,19 +253,6 @@ class SpotmicroEnv(gym.Env):
         self._update_history()
 
         return self._get_observation()
-    
-    def _map_action_to_position(self, norm_action: np.ndarray, joint_index: int) -> np.ndarray:
-        if joint_index in self._foot_link_ids:
-            s = self._foot_joint_limits[1] + self._foot_joint_limits[0]
-            d = self._foot_joint_limits[1] - self._foot_joint_limits[0]
-        elif joint_index in self._leg_link_ids:
-            s = self._leg_joint_limits[1] + self._leg_joint_limits[0]
-            d = self._leg_joint_limits[1] - self._leg_joint_limits[0]
-        elif joint_index in self._shoulder_link_ids:
-            s = self._shoulder_joint_limits[1] + self._shoulder_joint_limits[0]
-            d = self._shoulder_joint_limits[1] - self._shoulder_joint_limits[0]
-        
-        return 0.5*s + 0.5*d*norm_action
     
     def _get_joint_states(self) -> tuple[list[float], list[float]]:
         """
@@ -293,11 +266,6 @@ class SpotmicroEnv(gym.Env):
             positions.append(joint_state[0])
             velocities.append(joint_state[1])
 
-        #for joint_id in self._motor_joints_id:
-        #    joint_state = pybullet.getJointState(self._robot_id, joint_id)
-        #    positions.append(joint_state[0])  # position
-        #    velocities.append(joint_state[1])  # velocity
-        
         return positions, velocities
     
     def _get_ground_feet_contacts(self) -> set:
@@ -311,8 +279,9 @@ class SpotmicroEnv(gym.Env):
 
         for contact in contact_points:
             link_idx = contact[3]  # linkIndexA from your robot
-            if link_idx in self._foot_link_ids:
-                feet_in_contact.add(link_idx)
+            for joint in self._motor_joints:
+                if link_idx == joint.id and joint.type == "foot":
+                    feet_in_contact.add(link_idx)
         
         return feet_in_contact
 
