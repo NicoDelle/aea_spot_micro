@@ -5,6 +5,7 @@ It's actually quite useful to compare agains results obtained with a trained pol
 
 from SpotmicroEnv import SpotmicroEnv
 import time
+import pybullet
 
 env = SpotmicroEnv(use_gui=True)
 obs, _ = env.reset()

@@ -18,7 +18,7 @@ def test_reset_returns_valid_obs(env):
     assert isinstance(obs, np.ndarray)
     assert obs.shape == env.observation_space.shape
     assert isinstance(info, dict)
-    assert len(env._motor_joints_id) == 12
+    assert len(env._motor_joints) == 12
 
 def test_step_returns_valid_output(env):
     env.reset()
