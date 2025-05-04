@@ -25,7 +25,7 @@ class Joint:
         return self.mid + self.range * action
 
 class SpotmicroEnv(gym.Env):
-    def __init__(self, use_gui=False):
+    def __init__(self, use_gui=False, reward_fn=None):
         super().__init__()
 
         self._OBS_SPACE_SIZE = 94
@@ -77,7 +77,9 @@ class SpotmicroEnv(gym.Env):
             "min_height": 0.10, #meters?
             "max_height": 0.55,
             "max_pitchroll": np.radians(55)
-        } 
+        }
+
+        self._reward_fn = reward_fn or self._default_reward_fn
     
     def close(self):
         """
@@ -421,7 +423,7 @@ class SpotmicroEnv(gym.Env):
         )
 
     #@TODO: implement a well thought reward function
-    def _calculate_reward(self, action: np.ndarray) -> tuple[float, dict]:
+    def _default_reward_fn(self, action: np.ndarray) -> tuple[float, dict]:
         roll, pitch, _ = pybullet.getEulerFromQuaternion(self._agent_state["base_orientation"])
         base_height = self._agent_state["base_position"][2]
 
@@ -457,3 +459,6 @@ class SpotmicroEnv(gym.Env):
         total_reward = sum(reward_dict.values())
 
         return total_reward, reward_dict
+
+    def _calculate_reward(self, action: np.ndarray) -> tuple[float, dict]:
+        return self._reward_fn(action)
