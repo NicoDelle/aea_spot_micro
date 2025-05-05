@@ -4,6 +4,7 @@ import numpy as np
 import gymnasium as gym
 from collections import deque
 import matplotlib.pyplot as plt
+import inspect
 
 class Joint:
     def __init__(self, name: str, joint_id: int, joint_type: str, limits: tuple):
@@ -15,11 +16,11 @@ class Joint:
         self.type = joint_type # shoulder, leg, foot
 
         if self.type == "shoulder":
-            self.max_torque = 2.0
+            self.max_torque = 5.0
         elif self.type == "leg":
-            self.max_torque = 2.0
+            self.max_torque = 5.0
         elif self.type == "foot":
-            self.max_torque = 2.0
+            self.max_torque = 5.0
     
     def from_action_to_position(self, action: float) -> float:
         return self.mid + self.range * action
@@ -74,12 +75,69 @@ class SpotmicroEnv(gym.Env):
 
         #If the agents is in this state, we terminate the simulation. Should quantize the fact that it has fallen, maybe a threshold?
         self._target_state = {
-            "min_height": 0.10, #meters?
-            "max_height": 0.55,
+            "min_height": 0.15, #meters?
+            "max_height": 0.30,
             "max_pitchroll": np.radians(55)
         }
 
-        self._reward_fn = reward_fn or self._default_reward_fn
+        if reward_fn is None:
+            raise ValueError("reward_fn cannot be None. Provide a valid rewad function")
+        elif not callable(reward_fn):
+            raise ValueError("reward_fn must be callable (function)")
+
+        self._reward_fn = reward_fn
+    
+    @property
+    def agent_base_position(self) -> tuple[float, float, float]:
+        """
+        Returns the coordinates of the base of the agent in the form (x,y,z)
+        """
+        return tuple(self._agent_state["base_position"])
+    
+    @property
+    def agent_base_orientation(self) -> tuple[float, float, float, float]:
+        """
+        Returns the quaternion representign the orientation of the base, in the form (x, y, z, w)
+        """
+        return tuple(self._agent_state["base_orientation"])
+    
+    @property
+    def agent_linear_velocity(self) -> tuple[float, float, float]:
+        """
+        Returns the vector representign the linear velocity of the agent, in the form (vx, vy, vz)
+        """
+        return tuple(self._agent_state["linear_velocity"])
+    
+    @property
+    def agent_angular_velocity(self) -> tuple[float, float, float]:
+        """
+        Returns the vector representing the angular velocity of the agent, in the form (wx, wy, wz)
+        """
+        return self._agent_state["angular_velocity"]
+    
+    @property
+    def agent_ground_feet_contacts(self) -> set:
+        """
+        Returns a set of ids of the feet of the agent making contact with the ground
+        """
+        return self._agent_state["ground_feet_contacts"]
+    
+    @property
+    def target_direction(self) -> np.array:
+        """
+        Get the current target direction for locomotion (unit vector).
+        """
+        return self._TARGET_DIRECTION
+    
+    @target_direction.setter
+    def target_direction(self, direction: tuple[float, float, float]) -> None:
+        """
+        Set a new target direction for locomotion. Should be a normalized 3D vector
+        """
+        norm = np.linalg.norm(direction)
+        if norm == 0:
+            raise ValueError("Target direction cannot be a zero vector")
+        self._TARGET_DIRECTION = np.array(np.array(direction) / norm)
     
     def close(self):
         """
@@ -148,7 +206,7 @@ class SpotmicroEnv(gym.Env):
             physicsClientId = self.physics_client
         )
 
-        # Builld it once and make it immutable
+        # Builld the list of movable joints and assign all attributes
         if self._motor_joints is None:
             motor_joints = []
             for i in range(pybullet.getNumJoints(self._robot_id)):
@@ -161,8 +219,9 @@ class SpotmicroEnv(gym.Env):
                     joint_category = joint_name.split("_")[-1]
                     motor_joints.append(Joint(joint_name, i, joint_category, joint_limits))
 
-            self._motor_joints = tuple(motor_joints)
+            self._motor_joints = tuple(motor_joints) # Made immutable to avoid problems
 
+        # Setting friction
         for joint in self._motor_joints:
             if joint.type == "foot":
                 pybullet.changeDynamics(
@@ -175,10 +234,24 @@ class SpotmicroEnv(gym.Env):
         #this is just to let the physics stabilize? -> might need to remove this loop
         for _ in range(10):
             pybullet.stepSimulation(physicsClientId=self.physics_client)
-        
         self._update_agent_state()
-        observation = self._get_observation()
+
+        sig = inspect.signature(self._reward_fn)
+        if len(sig.parameters) != 2:
+            raise ValueError("reward_fn must accept exactly 2 parameters (env, action)")
+            
+        # Test reward function return type
+        try:
+            dummy_action = np.zeros(self._ACT_SPACE_SIZE)
+            reward, info = self._reward_fn(self, dummy_action)
+            if not isinstance(reward, (int, float)):
+                raise ValueError("reward_fn must return a number as first return value")
+            if not isinstance(info, dict):
+                raise ValueError("reward_fn must return a dict as second return value")
+        except Exception as e:
+            raise ValueError(f"Error testing reward_fn: {str(e)}")
         
+        observation = self._get_observation()
         return (observation, self._get_info())
 
     def step(self, action: np.ndarray) -> tuple[gym.spaces.Box, float, bool, bool, dict]:
@@ -207,7 +280,6 @@ class SpotmicroEnv(gym.Env):
         terminated = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
         truncated = self._is_terminated()
         info = self._get_info()
-
 
         self._episode_reward_info.append(reward_info)
         if truncated:
@@ -253,7 +325,7 @@ class SpotmicroEnv(gym.Env):
                 jointIndex = joint.id,
                 controlMode = pybullet.POSITION_CONTROL,
                 targetPosition = joint.from_action_to_position(action[i]),
-                force=joint.max_torque
+                force = joint.max_torque
             )
         
         self._step_counter += 1 #updates the step counter (used to check against timeouts)
@@ -422,7 +494,7 @@ class SpotmicroEnv(gym.Env):
             physicsClientId=self.physics_client
         )
 
-    #@TODO: implement a well thought reward function
+    #@TODO: probably just remove the default option? and throw an error if no function is passed as an input
     def _default_reward_fn(self, action: np.ndarray) -> tuple[float, dict]:
         roll, pitch, _ = pybullet.getEulerFromQuaternion(self._agent_state["base_orientation"])
         base_height = self._agent_state["base_position"][2]
@@ -461,4 +533,4 @@ class SpotmicroEnv(gym.Env):
         return total_reward, reward_dict
 
     def _calculate_reward(self, action: np.ndarray) -> tuple[float, dict]:
-        return self._reward_fn(action)
+        return self._reward_fn(self, action)
