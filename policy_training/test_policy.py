@@ -2,13 +2,13 @@ import time
 import numpy as np
 from stable_baselines3 import PPO
 from SpotmicroEnv import SpotmicroEnv
+from reward_function import reward_function
 
-# Load environment in GUI mode
-env = SpotmicroEnv(use_gui=True)
+env = SpotmicroEnv(use_gui=True, reward_fn=reward_function)
 obs, _ = env.reset()
 
 # Load your trained model
-model = PPO.load("ppo_walk10k")  # or path to your .zip
+model = PPO.load("ppo_walk3M-2")  # or path to your .zip
 
 # Run rollout
 for _ in range(3001):
