@@ -8,7 +8,7 @@ env = SpotmicroEnv(use_gui=True, reward_fn=reward_function)
 obs, _ = env.reset()
 
 # Load your trained model
-model = PPO.load("ppo_walk3M-2")  # or path to your .zip
+model = PPO.load("ppo_walk3M-4")  # or path to your .zip
 
 # Run rollout
 for _ in range(3001):

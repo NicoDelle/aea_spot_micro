@@ -8,8 +8,8 @@ TOTAL_STEPS = 1_000_000
 env = SpotmicroEnv(use_gui=False, reward_fn=reward_function)
 check_env(env, warn=True) #optional
 
-model = PPO.load("ppo_walk2M")
+model = PPO.load("ppo_walk2M-3")
 model.set_env(env)
 model.tensorboard_log = "./logs"
 model.learn(total_timesteps=TOTAL_STEPS, reset_num_timesteps=False)
-model.save("ppo_walk3M-2")
+model.save("ppo_walk3M-3")

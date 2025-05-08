@@ -3,7 +3,7 @@ from SpotmicroEnv import SpotmicroEnv
 from stable_baselines3.common.env_checker import check_env
 from reward_function import reward_function
 
-TOTAL_STEPS = 1_000_000
+TOTAL_STEPS = 3_000_000
 
 env = SpotmicroEnv(use_gui=False, reward_fn=reward_function)
 check_env(env, warn=True) #optional
@@ -18,4 +18,4 @@ model = PPO(
     tensorboard_log="./logs"
 )
 model.learn(total_timesteps=TOTAL_STEPS)
-model.save("ppo_walk1M")
+model.save("ppo_walk3M-4")
