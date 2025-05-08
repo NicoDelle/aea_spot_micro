@@ -5,9 +5,9 @@ It's actually quite useful to compare agains results obtained with a trained pol
 
 from SpotmicroEnv import SpotmicroEnv
 import time
-import pybullet
+from reward_function import reward_function
 
-env = SpotmicroEnv(use_gui=True)
+env = SpotmicroEnv(use_gui=True, reward_fn=reward_function)
 obs, _ = env.reset()
 
 for _ in range(300):
