@@ -14,13 +14,14 @@ class Joint:
         self.mid = 0.5 * (self.limits[0] + self.limits[1])
         self.range = 0.5 * (self.limits[1] - self.limits[0])
         self.type = joint_type # shoulder, leg, foot
+        self.effort = 0
 
         if self.type == "shoulder":
-            self.max_torque = 5.0
+            self.max_torque = 6.81
         elif self.type == "leg":
-            self.max_torque = 5.0
+            self.max_torque = 6.81
         elif self.type == "foot":
-            self.max_torque = 5.0
+            self.max_torque = 6.81
     
     def from_action_to_position(self, action: float) -> float:
         return self.mid + self.range * action
@@ -33,7 +34,7 @@ class SpotmicroEnv(gym.Env):
         self._ACT_SPACE_SIZE = 12
         self._MAX_EPISODE_LEN = 3000
         self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
-        self._TARGET_HEIGHT = 0.235
+        self._TARGET_HEIGHT = 0.230
         self._SURVIVAL_REWARD = 15.0
         self._SIM_FREQUENCY = 240
         self._CONTROL_FREQUENCY = 60
@@ -138,6 +139,13 @@ class SpotmicroEnv(gym.Env):
         if norm == 0:
             raise ValueError("Target direction cannot be a zero vector")
         self._TARGET_DIRECTION = np.array(np.array(direction) / norm)
+    
+    @property
+    def num_steps(self) -> int:
+        """
+        Return the current number of steps
+        """
+        return self._step_counter
     
     def close(self):
         """
@@ -269,6 +277,7 @@ class SpotmicroEnv(gym.Env):
                 - truncated (bool): Whether the episode was artificially terminated.
                 - info (dict): Contains auxiliary diagnostic information.
         """
+        #Slow down the control loop
         if self._action_counter == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY):
             observation = self._step_simulation(action)
             self._action_counter = 0
@@ -494,43 +503,8 @@ class SpotmicroEnv(gym.Env):
             physicsClientId=self.physics_client
         )
 
-    #@TODO: probably just remove the default option? and throw an error if no function is passed as an input
-    def _default_reward_fn(self, action: np.ndarray) -> tuple[float, dict]:
-        roll, pitch, _ = pybullet.getEulerFromQuaternion(self._agent_state["base_orientation"])
-        base_height = self._agent_state["base_position"][2]
-
-        uprightness = 1.0 - (abs(roll) + abs(pitch)) / np.radians(60)
-        uprightness = np.clip(uprightness, 0.0, 1.0)
-        height_error = abs(base_height - self._TARGET_HEIGHT)
-
-        action_penalty = np.arctan(np.linalg.norm(action)) #might look into forces?. Penalize also joint saturation
-        penalty_scale = 1.0 - np.exp(-1e-6 * self._total_steps_counter)
-
-        fwd_reward = np.dot(self._agent_state["linear_velocity"], self._TARGET_DIRECTION) / (np.linalg.norm(self._agent_state["linear_velocity"]) + 1e-8)
-        
-        # Gating conditions: must be upright and at good height
-        is_standing = (0.20 <= base_height <= 0.26) and (abs(roll) < np.radians(30)) and (abs(pitch) < np.radians(30))
-
-        if is_standing:
-            if len(self._agent_state["ground_feet_contacts"]) >= 3:
-                contact_reward = 1.0
-            else:
-                contact_reward = -0.2
-        else:
-            contact_reward = -0.5  # Penalize contact when collapsed
-            
-        # Each reward component
-        reward_dict = {
-            "fwd_reward": 10 * (1 - penalty_scale) * fwd_reward,
-            "height_penalty": 3 * height_error,
-            "contact_reward": 0 * contact_reward,
-            "uprightness": 3 * uprightness,
-            "action_penalty": - 1 * penalty_scale * action_penalty
-        }
-
-        total_reward = sum(reward_dict.values())
-
-        return total_reward, reward_dict
-
     def _calculate_reward(self, action: np.ndarray) -> tuple[float, dict]:
+        """
+        Placeholder method that calls the reward function provided as an input
+        """
         return self._reward_fn(self, action)

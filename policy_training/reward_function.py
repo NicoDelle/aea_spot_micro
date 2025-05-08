@@ -8,6 +8,7 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     linear_vel = np.array(env.agent_linear_velocity)
     angular_vel = np.array(env.agent_angular_velocity)
     contacts = env.agent_ground_feet_contacts
+    scale = 1 - np.exp(- 0.333 * (env.num_steps / 1_000_000))
 
     # === 1. Forward Progress ===
     fwd_velocity = np.dot(linear_vel, env._TARGET_DIRECTION)
@@ -34,10 +35,10 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
 
     # === Reward weighting ===
     reward_dict = {
-        "fwd_reward": 3.5 * fwd_reward,
-        "uprightness": 3.5 * upright_reward,
-        "height": 2 * height_reward,
-        "energy_penalty": -0.5 * energy_penalty,
+        "fwd_reward": 2 * fwd_reward,
+        "uprightness": 2.5 * upright_reward,
+        "height": 1.5 * height_reward,
+        "energy_penalty": -0.8 * scale * energy_penalty,
         "contact_bonus": 2 * contact_bonus
     }
 
