@@ -146,6 +146,13 @@ class SpotmicroEnv(gym.Env):
         Return the current number of steps
         """
         return self._step_counter
+
+    @property
+    def motor_joints(self) -> list:
+        """
+        Return the list of movable joints (a list of Joint objects)
+        """
+        return self._motor_joints
     
     def close(self):
         """
@@ -441,6 +448,10 @@ class SpotmicroEnv(gym.Env):
         self._agent_state["base_position"], self._agent_state["base_orientation"] = pybullet.getBasePositionAndOrientation(self._robot_id)
         self._agent_state["linear_velocity"], self._agent_state["angular_velocity"] = pybullet.getBaseVelocity(self._robot_id)
         self._agent_state["ground_feet_contacts"] = self._get_ground_feet_contacts()
+
+        for joint in self._motor_joints:
+            joint_state = pybullet.getJointState(self._robot_id, joint.id)
+            joint.effort = joint_state[3]
 
         return  
 

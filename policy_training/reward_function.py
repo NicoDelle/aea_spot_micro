@@ -10,6 +10,10 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     contacts = env.agent_ground_feet_contacts
     scale = 1 - np.exp(- 0.333 * (env.num_steps / 1_000_000))
 
+    effort = 0.0
+    for joint in env.motor_joints:
+        effort += abs(joint.effort) / joint.max_torque
+
     # === 1. Forward Progress ===
     fwd_velocity = np.dot(linear_vel, env._TARGET_DIRECTION)
     fwd_reward = np.clip(fwd_velocity, -1, 0.5)  # m/s, clip for robustness
@@ -39,7 +43,8 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
         "uprightness": 2.5 * upright_reward,
         "height": 1.5 * height_reward,
         "energy_penalty": -0.8 * scale * energy_penalty,
-        "contact_bonus": 2 * contact_bonus
+        "contact_bonus": 2 * contact_bonus,
+        "reward_penalty": -0.25 * effort
     }
 
     total_reward = sum(reward_dict.values())
