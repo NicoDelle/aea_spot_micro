@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import inspect
 
 class Joint:
-    def __init__(self, name: str, joint_id: int, joint_type: str, limits: tuple):
+    def __init__(self, name: str, joint_id: int, joint_link_idx: int, joint_type: str, limits: tuple):
         self.name = name
         self.id = joint_id
+        self.link_id = joint_link_idx
         self.limits = limits
         self.mid = 0.5 * (self.limits[0] + self.limits[1])
         self.range = 0.5 * (self.limits[1] - self.limits[0])
@@ -226,13 +227,14 @@ class SpotmicroEnv(gym.Env):
             motor_joints = []
             for i in range(pybullet.getNumJoints(self._robot_id)):
                 joint_info = pybullet.getJointInfo(self._robot_id, i)
+                joint_link_id = joint_info[0]
                 joint_name = joint_info[1].decode("utf-8")
                 joint_type = joint_info[2]
                 joint_limits = (joint_info[8], joint_info[9])
 
                 if joint_type == pybullet.JOINT_REVOLUTE:
                     joint_category = joint_name.split("_")[-1]
-                    motor_joints.append(Joint(joint_name, i, joint_category, joint_limits))
+                    motor_joints.append(Joint(joint_name, i, joint_link_id, joint_category, joint_limits))
 
             self._motor_joints = tuple(motor_joints) # Made immutable to avoid problems
 
@@ -304,6 +306,7 @@ class SpotmicroEnv(gym.Env):
         self._previous_action = action.copy()
         self._total_steps_counter += 1
 
+        print(self.agent_ground_feet_contacts)
         return observation, reward, terminated, truncated, info
     
     def plot_reward_components(self):
@@ -375,6 +378,9 @@ class SpotmicroEnv(gym.Env):
         self._joint_history.appendleft(hist)
     
     def _get_ground_feet_contacts(self) -> set:
+        """
+        This method saves which feet are touching the ground
+        """
         contact_points = pybullet.getContactPoints(
             bodyA=self._robot_id,
             bodyB=self._plane_id,
@@ -386,8 +392,8 @@ class SpotmicroEnv(gym.Env):
         for contact in contact_points:
             link_idx = contact[3]  # linkIndexA from your robot
             for joint in self._motor_joints:
-                if link_idx == joint.id and joint.type == "foot":
-                    feet_in_contact.add(link_idx)
+                if link_idx -1 == joint.link_id and joint.type == "foot": # linkd indices in contacts are shifted by 1 compared to the ones stored in the joint objects (it's conventional). We apply the -1 shift to address the joint with their saved link_id
+                    feet_in_contact.add(link_idx - 1)
         
         return feet_in_contact
 
