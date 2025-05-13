@@ -306,7 +306,6 @@ class SpotmicroEnv(gym.Env):
         self._previous_action = action.copy()
         self._total_steps_counter += 1
 
-        print(self.agent_ground_feet_contacts)
         return observation, reward, terminated, truncated, info
     
     def plot_reward_components(self):

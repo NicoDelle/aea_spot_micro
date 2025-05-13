@@ -8,15 +8,17 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     linear_vel = np.array(env.agent_linear_velocity)
     angular_vel = np.array(env.agent_angular_velocity)
     contacts = env.agent_ground_feet_contacts
-    scale = 1 - np.exp(- 0.333 * (env.num_steps / 1_000_000))
+    scale = lambda coeff: 1 - np.exp(- coeff * (env.num_steps / 1_000_000)) #0->1
 
     effort = 0.0
     for joint in env.motor_joints:
         effort += abs(joint.effort) / joint.max_torque
+    effort /= len(env.motor_joints)
 
     # === 1. Forward Progress ===
     fwd_velocity = np.dot(linear_vel, env._TARGET_DIRECTION)
     fwd_reward = np.clip(fwd_velocity, -1, 0.5)  # m/s, clip for robustness
+    stillness_penalty = 0.5 * (linear_vel[0] < 0.1)
 
     # === 2. Uprightness (Pitch & Roll) ===
     max_angle = np.radians(55)
@@ -37,14 +39,15 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     # === 5. Contact (optional) ===
     contact_bonus = 1.0 if len(contacts) >= 3 else -0.5
 
-    # === Reward weighting ===
+    #=== Reward weighting ===
     reward_dict = {
-        "fwd_reward": 2 * fwd_reward,
+        "fwd_reward": 6.5 * scale(0.2) * fwd_reward,
         "uprightness": 2.5 * upright_reward,
         "height": 1.5 * height_reward,
-        "energy_penalty": -0.8 * scale * energy_penalty,
-        "contact_bonus": 2 * contact_bonus,
-        "reward_penalty": -0.25 * effort
+        "contact_bonus": 3 * scale(0.45) * contact_bonus,
+        "energy_penalty": -0.85 * scale(0.30) * energy_penalty,
+        "stillness_penalty": -2 * scale(0.15) * stillness_penalty,
+        "effort_penalty": -1 * scale(0.30) * effort
     }
 
     total_reward = sum(reward_dict.values())
