@@ -1,14 +1,13 @@
-import pybullet
-import pybullet_data
+import pybullet, pybullet_data
 import numpy as np
 import gymnasium as gym
 from collections import deque
 import matplotlib.pyplot as plt
-import inspect
+import inspect, os, pickle, warnings
 
 class Joint:
     def __init__(self, name: str, joint_id: int, joint_link_idx: int, joint_type: str, limits: tuple):
-        self.name = name
+        self.name = nameself.load_state()
         self.id = joint_id
         self.link_id = joint_link_idx
         self.limits = limits
@@ -28,7 +27,7 @@ class Joint:
         return self.mid + self.range * action
 
 class SpotmicroEnv(gym.Env):
-    def __init__(self, use_gui=False, reward_fn=None):
+    def __init__(self, use_gui=False, reward_fn=None, dest_save_file=None, src_save_file=None):
         super().__init__()
 
         self._OBS_SPACE_SIZE = 94
@@ -39,14 +38,15 @@ class SpotmicroEnv(gym.Env):
         self._SURVIVAL_REWARD = 15.0
         self._SIM_FREQUENCY = 240
         self._CONTROL_FREQUENCY = 60
+        self._JOINT_HISTORY_MAX_LEN = 5
 
-        self._step_counter = 0
+        self._episode_step_counter = 0
         self._total_steps_counter = 0
 
         self._robot_id = None
         self._plane_id = None
         self._motor_joints = None
-        self._joint_history = deque(maxlen=5)
+        self._joint_history = deque(maxlen=self._JOINT_HISTORY_MAX_LEN)
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
         self.use_gui = use_gui
@@ -88,7 +88,51 @@ class SpotmicroEnv(gym.Env):
             raise ValueError("reward_fn must be callable (function)")
 
         self._reward_fn = reward_fn
+
+        if dest_save_file is not None:
+            if not isinstance(dest_save_file, str):
+                raise TypeError("Destination file path must be a string.")
+            if os.path.exists(dest_save_file):
+                warnings.warn(f"File '{dest_save_file}' already exists and will be overwritten.", UserWarning)
+            if not dest_save_file.endswith(".pkl"):
+                raise ValueError("Expected a .pkl file for environment state save destination")
+            
+            self._dest_save = dest_save_file
+
+        if src_save_file is not None:
+            if not isinstance(src_save_file, str):
+                raise TypeError("Source file path must be a string.")
+            if not os.path.exists(src_save_file):
+                raise FileNotFoundError(f"No file found at {src_save_file}")
+            if not src_save_file.endswith(".pkl"):
+                raise ValueError("Expected a .pkl file for environment state save source")
+            
+            self._src_file = src_save_file
+        
+            self.load_state()
+
+        print(f"NUMSTEPS GABIBBOOO: {self.num_steps}") #DEBUG
     
+    def save_state(self):
+        state = {
+            "total_steps_counter": self._total_steps_counter,
+            "previous_action": self._previous_action,
+            "joint_history": list(self._joint_history),
+            "target_direction": self._TARGET_DIRECTION
+        }
+
+        with open(self._dest_save, "wb") as f:
+            pickle.dump(state, f)
+
+    def load_state(self):
+        with open(self._src_file, 'rb') as f:
+            state = pickle.load(f)
+        
+        self._total_steps_counter = state["total_steps_counter"]
+        self._previous_action = state["previous_action"]
+        self._joint_history = deque(state["joint_history"], maxlen=self._JOINT_HISTORY_MAX_LEN)
+        self._TARGET_DIRECTION = state["target_direction"]
+
     @property
     def agent_base_position(self) -> tuple[float, float, float]:
         """
@@ -146,7 +190,7 @@ class SpotmicroEnv(gym.Env):
         """
         Return the current number of steps
         """
-        return self._step_counter
+        return self._total_steps_counter
 
     @property
     def motor_joints(self) -> list:
@@ -158,11 +202,14 @@ class SpotmicroEnv(gym.Env):
     def close(self):
         """
         Method exposed and used by SB3.
-        Clean up the simulation.
+        Cleans up the simulation, saves the state if a destination path is provided
         """
         if self.physics_client is not None:
             pybullet.disconnect(self.physics_client)
             self.physics_client = None
+
+        if self._dest_save is not None:
+            self.save_state()
 
     def reset(self, seed: int |None = None, options: dict | None = None) -> tuple[gym.spaces.Box, dict]:
         """
@@ -171,7 +218,7 @@ class SpotmicroEnv(gym.Env):
         """
         
         super().reset(seed=seed)
-        self._step_counter = 0
+        self._episode_step_counter = 0
         self._action_counter = 0
         self._agent_state["base_position"] = (0.0 , 0.0, 0.255) #Height set specifically through trial and error
         self._agent_state["base_orientation"] = pybullet.getQuaternionFromEuler([0,0,0])
@@ -346,7 +393,7 @@ class SpotmicroEnv(gym.Env):
                 force = joint.max_torque
             )
         
-        self._step_counter += 1 #updates the step counter (used to check against timeouts)
+        self._episode_step_counter += 1 #updates the step counter (used to check against timeouts)
         pybullet.stepSimulation()
 
         self._update_agent_state()
@@ -481,7 +528,7 @@ class SpotmicroEnv(gym.Env):
         """
         Function that returns wether an episode was terminated artificially or timed out
         """
-        return (self._step_counter >= self._MAX_EPISODE_LEN)
+        return (self._episode_step_counter >= self._MAX_EPISODE_LEN)
 
     def _get_info(self) -> dict:
         """
@@ -493,7 +540,7 @@ class SpotmicroEnv(gym.Env):
         return {
             "height": self._agent_state["base_position"][2],
             "pitch": pybullet.getEulerFromQuaternion(self._agent_state["base_orientation"])[1],
-            "episode_step": self._step_counter
+            "episode_step": self._episode_step_counter
         }
 
     def _tilt_plane(self):
