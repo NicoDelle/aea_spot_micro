@@ -7,7 +7,7 @@ import inspect, os, pickle, warnings
 
 class Joint:
     def __init__(self, name: str, joint_id: int, joint_link_idx: int, joint_type: str, limits: tuple):
-        self.name = nameself.load_state()
+        self.name = name
         self.id = joint_id
         self.link_id = joint_link_idx
         self.limits = limits
