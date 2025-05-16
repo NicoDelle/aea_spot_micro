@@ -132,44 +132,55 @@ class SpotmicroEnv(gym.Env):
         self._previous_action = state["previous_action"]
         self._joint_history = deque(state["joint_history"], maxlen=self._JOINT_HISTORY_MAX_LEN)
         self._TARGET_DIRECTION = state["target_direction"]
+    
+    def _is_state_initialized(self, key: str):
+        value = self._agent_state.get(key)
+        if value is None:
+            raise ValueError(f"'{key}' has not been initialized (is currently None)")
+        return value
 
     @property
     def agent_base_position(self) -> tuple[float, float, float]:
         """
         Returns the coordinates of the base of the agent in the form (x,y,z)
         """
-        return tuple(self._agent_state["base_position"])
+        base_pos = self._is_state_initialized("base_position")
+        return tuple(base_pos)
     
     @property
     def agent_base_orientation(self) -> tuple[float, float, float, float]:
         """
         Returns the quaternion representign the orientation of the base, in the form (x, y, z, w)
         """
-        return tuple(self._agent_state["base_orientation"])
+        base_ori = self._is_state_initialized("base_orientation")
+        return tuple(base_ori)
     
     @property
     def agent_linear_velocity(self) -> tuple[float, float, float]:
         """
         Returns the vector representign the linear velocity of the agent, in the form (vx, vy, vz)
         """
-        return tuple(self._agent_state["linear_velocity"])
+        lin_vel = self._is_state_initialized("linear_velocity")
+        return tuple(lin_vel)
     
     @property
     def agent_angular_velocity(self) -> tuple[float, float, float]:
         """
         Returns the vector representing the angular velocity of the agent, in the form (wx, wy, wz)
         """
-        return self._agent_state["angular_velocity"]
+        ang_vel = self._is_state_initialized("angular_velocity")
+        return tuple(ang_vel)
     
     @property
     def agent_ground_feet_contacts(self) -> set:
         """
         Returns a set of ids of the feet of the agent making contact with the ground
         """
-        return self._agent_state["ground_feet_contacts"]
+        gf_contacts = self._is_state_initialized("ground_feet_contacts")
+        return gf_contacts
     
     @property
-    def target_direction(self) -> np.array:
+    def target_direction(self) -> np.ndarray:
         """
         Get the current target direction for locomotion (unit vector).
         """
@@ -193,10 +204,12 @@ class SpotmicroEnv(gym.Env):
         return self._total_steps_counter
 
     @property
-    def motor_joints(self) -> list:
+    def motor_joints(self) -> tuple:
         """
         Return the list of movable joints (a list of Joint objects)
         """
+        if self._motor_joints is None:
+            raise ValueError("List of movable joint is not initialized yet. Yous hould call .reset() at least once before trying to access this attribute")
         return self._motor_joints
     
     def close(self):
@@ -224,6 +237,7 @@ class SpotmicroEnv(gym.Env):
         self._agent_state["base_orientation"] = pybullet.getQuaternionFromEuler([0,0,0])
         self._agent_state["linear_velocity"] = np.zeros(3)
         self._agent_state["angular_velocity"] = np.zeros(3)
+        self._agent_state["ground_feet_contacts"] = set()
 
         self._episode_reward_info = []
 
