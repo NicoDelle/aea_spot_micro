@@ -18,7 +18,8 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     # === 1. Forward Progress ===
     fwd_velocity = np.dot(linear_vel, env._TARGET_DIRECTION)
     fwd_reward = np.clip(fwd_velocity, -1, 0.5)  # m/s, clip for robustness
-    stillness_penalty = 0.5 * (linear_vel[0] < 0.1)
+    deviation_velocity = abs(np.dot(linear_vel, np.array([0,1,0])))
+    deviation_penalty = np.clip(deviation_velocity, 0, 1)
 
     # === 2. Uprightness (Pitch & Roll) ===
     max_angle = np.radians(55)
@@ -38,15 +39,16 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
 
     # === 5. Contact (optional) ===
     contact_bonus = 1.0 if len(contacts) >= 3 else -0.5
+    env.set_custom_state("previous_gfc", env.agent_ground_feet_contacts) 
 
     #=== Reward weighting ===
     reward_dict = {
-        "fwd_reward": 6.5 * scale(0.2) * fwd_reward,
+        "fwd_reward": 7 * scale(0.2) * fwd_reward,
+        "deviation_penalty": -2 * scale(0.2) * deviation_penalty,
         "uprightness": 2.5 * upright_reward,
         "height": 1.5 * height_reward,
         "contact_bonus": 3 * scale(0.45) * contact_bonus,
         "energy_penalty": -0.85 * scale(0.30) * energy_penalty,
-        "stillness_penalty": -2 * scale(0.15) * stillness_penalty,
         "effort_penalty": -1 * scale(0.30) * effort
     }
 

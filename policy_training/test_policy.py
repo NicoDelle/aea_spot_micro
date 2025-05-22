@@ -4,11 +4,11 @@ from stable_baselines3 import PPO
 from SpotmicroEnv import SpotmicroEnv
 from reward_function import reward_function
 
-env = SpotmicroEnv(use_gui=True, reward_fn=reward_function, src_save_file="state4M-1.pkl")
+env = SpotmicroEnv(use_gui=True, reward_fn=reward_function, src_save_file="state4M-2.pkl")
 obs, _ = env.reset()
 
 # Load your trained model
-model = PPO.load("ppo_walk4M-1")  # or path to your .zip
+model = PPO.load("ppo_walk4M-2")  # or path to your .zip
 
 # Run rollout
 for _ in range(3001):

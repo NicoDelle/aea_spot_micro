@@ -17,11 +17,11 @@ class Joint:
         self.effort = 0
 
         if self.type == "shoulder":
-            self.max_torque = 6.81
+            self.max_torque = 6.3 #hard limit for all would be 6.81, lowering to see if improves results
         elif self.type == "leg":
-            self.max_torque = 6.81
+            self.max_torque = 6.3
         elif self.type == "foot":
-            self.max_torque = 6.81
+            self.max_torque = 6.3
     
     def from_action_to_position(self, action: float) -> float:
         return self.mid + self.range * action
@@ -75,6 +75,8 @@ class SpotmicroEnv(gym.Env):
             "ground_feet_contacts": None
         }
 
+        self._custom_state = dict()
+
         #If the agents is in this state, we terminate the simulation. Should quantize the fact that it has fallen, maybe a threshold?
         self._target_state = {
             "min_height": 0.15, #meters?
@@ -89,27 +91,27 @@ class SpotmicroEnv(gym.Env):
 
         self._reward_fn = reward_fn
 
-        if dest_save_file is not None:
-            if not isinstance(dest_save_file, str):
+        self._dest_save = dest_save_file
+        if self._dest_save is not None:
+            if not isinstance(self._dest_save, str):
                 raise TypeError("Destination file path must be a string.")
             if os.path.exists(dest_save_file):
-                warnings.warn(f"File '{dest_save_file}' already exists and will be overwritten.", UserWarning)
-            if not dest_save_file.endswith(".pkl"):
+                warnings.warn(f"File '{self._dest_save}' already exists and will be overwritten.", UserWarning)
+            if not self._dest_save.endswith(".pkl"):
                 raise ValueError("Expected a .pkl file for environment state save destination")
             
-            self._dest_save = dest_save_file
 
-        if src_save_file is not None:
-            if not isinstance(src_save_file, str):
+        self._src_file = src_save_file
+        if self._src_file is not None:
+            if not isinstance(self._src_file, str):
                 raise TypeError("Source file path must be a string.")
-            if not os.path.exists(src_save_file):
-                raise FileNotFoundError(f"No file found at {src_save_file}")
+            if not os.path.exists(self._src_file):
+                raise FileNotFoundError(f"No file found at {self._src_file}")
             if not src_save_file.endswith(".pkl"):
                 raise ValueError("Expected a .pkl file for environment state save source")
             
-            self._src_file = src_save_file
-        
             self.load_state()
+        
 
         print(f"NUMSTEPS GABIBBOOO: {self.num_steps}") #DEBUG
     
@@ -211,6 +213,22 @@ class SpotmicroEnv(gym.Env):
         if self._motor_joints is None:
             raise ValueError("List of movable joint is not initialized yet. Yous hould call .reset() at least once before trying to access this attribute")
         return self._motor_joints
+
+    def get_custom_state(self, key: str):
+        """
+        Returns the value corresponding to the given key inside a dictionary of custom variables.
+        """
+        if key not in self._custom_state.keys():
+            raise ValueError(f"No value was initialized for the given key ({key})")
+        return self._custom_state[key]
+    
+    
+    def set_custom_state(self, key: str, value):
+        """
+        If given a value, it instead changes the value of the given key to the provided value
+        """
+        self._custom_state[key] = value
+
     
     def close(self):
         """
