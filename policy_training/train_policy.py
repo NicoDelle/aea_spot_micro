@@ -4,7 +4,7 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.env_checker import check_env
 from reward_function import reward_function, init_custom_state
 
-TOTAL_STEPS = 4_000_000
+TOTAL_STEPS = 5_000_000
 
 def clipped_linear_schedule(initial_value, min_value=1e-5):
     def schedule(progress_remaining):
@@ -17,7 +17,7 @@ def make_env(rank):
             use_gui=False,
             reward_fn=reward_function,
             init_custom_state=init_custom_state,
-            dest_save_file=f"state4M-6-{rank}.pkl"
+            dest_save_file=f"state5M-6-{rank}.pkl"
         )
         env.seed(100 + rank)
         return env
@@ -31,7 +31,7 @@ def main():
     model = PPO(
         "MlpPolicy", 
         vec_env, 
-        verbose=0, 
+        verbose=1, 
         learning_rate=clipped_linear_schedule(3e-4),
         ent_coef=0.002,
         clip_range=0.1,
@@ -39,7 +39,7 @@ def main():
     )
 
     model.learn(total_timesteps=TOTAL_STEPS)
-    model.save("ppo_walk4M-6")
+    model.save("ppo_walk5M-6")
 
     end_time = time.time()
     print(f"\nTraining completed in {end_time - start_time:.2f} seconds.")
