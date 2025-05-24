@@ -17,7 +17,9 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
 
     scale_coefficient = 1.5
     fade_in_at = lambda start: 0 if env.num_steps < start else 1 - np.exp(- scale_coefficient * ((env.num_steps - start) / 1_000_000)) #0->1
+    fade_out_at = lambda start: 1 if env.num_steps < start else np.exp(- scale_coefficient * ((env.num_steps - start) / 1_000_000)) #1->0
 
+    # === 0. Effort ===
     effort = 0.0
     for joint in env.motor_joints:
         effort += abs(joint.effort) / joint.max_torque #normalzing each contributio by max effort
@@ -28,6 +30,7 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     fwd_reward = np.clip(fwd_velocity, -1, 1)  # m/s, clip for robustness
     deviation_velocity = abs(np.dot(linear_vel, np.array([0,1,0])))
     deviation_penalty = np.clip(deviation_velocity, 0, 1)
+    stillness_reward = 1.0 if np.linalg.norm(linear_vel) < 0.05 else 0.0
 
     # === 2. Uprightness (Pitch & Roll) ===
     max_angle = np.radians(55)
@@ -55,6 +58,7 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     weights_dict = {
         "fwd_reward": 7 * fade_in_at(200_000),
         "deviation_penalty": -3 * fade_in_at(200_000),
+        "stillness_reward": 2 * fade_out_at(50_000),
         "uprightness": 2.5,
         "height": 2.5,
         "contact_bonus": 4,
@@ -66,6 +70,7 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     reward_dict = {
         "fwd_reward": fwd_reward,
         "deviation_penalty": deviation_penalty,
+        "stilless_reward": stillness_reward,
         "uprightness": upright_reward,
         "height": height_reward,
         "contact_bonus": contact_bonus,
