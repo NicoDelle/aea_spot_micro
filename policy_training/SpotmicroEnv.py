@@ -10,6 +10,8 @@ class Joint:
         self.name = name
         self.id = joint_id
         self.link_id = joint_link_idx
+        if limits[0] >= limits[1]:
+            raise ValueError(f"Joint {self.name} has invalid limits: {limits}")
         self.limits = limits
         self.mid = 0.5 * (self.limits[0] + self.limits[1])
         self.range = 0.5 * (self.limits[1] - self.limits[0])
@@ -27,7 +29,7 @@ class Joint:
         return self.mid + self.range * action
 
 class SpotmicroEnv(gym.Env):
-    def __init__(self, use_gui=False, reward_fn=None, dest_save_file=None, src_save_file=None):
+    def __init__(self, use_gui=False, reward_fn=None, init_custom_state=None, dest_save_file=None, src_save_file=None):
         super().__init__()
 
         self._OBS_SPACE_SIZE = 94
@@ -50,6 +52,7 @@ class SpotmicroEnv(gym.Env):
         self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
         self.physics_client = None
         self.use_gui = use_gui
+        self.np_random = None
 
         self._episode_reward_info = None
 
@@ -91,6 +94,14 @@ class SpotmicroEnv(gym.Env):
 
         self._reward_fn = reward_fn
 
+        # Initialize custom function if provided
+        if init_custom_state is not None:
+            if not callable(init_custom_state):
+                raise ValueError("init_custom_fn must be callable (function)")
+            self._init_custom_state = init_custom_state
+        else:
+            self._init_custom_state = lambda env: None
+    
         self._dest_save = dest_save_file
         if self._dest_save is not None:
             if not isinstance(self._dest_save, str):
@@ -111,10 +122,7 @@ class SpotmicroEnv(gym.Env):
                 raise ValueError("Expected a .pkl file for environment state save source")
             
             self.load_state()
-        
-
-        print(f"NUMSTEPS GABIBBOOO: {self.num_steps}") #DEBUG
-    
+            
     def save_state(self):
         state = {
             "total_steps_counter": self._total_steps_counter,
@@ -327,6 +335,9 @@ class SpotmicroEnv(gym.Env):
                     physicsClientId=self.physics_client
                 )
 
+        # Initialize custom state
+        self._init_custom_state(self)
+
         #this is just to let the physics stabilize? -> might need to remove this loop
         for _ in range(10):
             pybullet.stepSimulation(physicsClientId=self.physics_client)
@@ -347,8 +358,13 @@ class SpotmicroEnv(gym.Env):
         except Exception as e:
             raise ValueError(f"Error testing reward_fn: {str(e)}")
         
+
         observation = self._get_observation()
         return (observation, self._get_info())
+    
+    def seed(self, seed=None):
+        self.np_random, seed = gym.utils.seeding.np_random(seed)
+        return [seed]
 
     def step(self, action: np.ndarray) -> tuple[gym.spaces.Box, float, bool, bool, dict]:
         """

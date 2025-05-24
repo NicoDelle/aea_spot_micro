@@ -13,3 +13,5 @@ policy_training/logs
 ppo_*
 *.png
 *.pkl
+*.txt
+dockerfile

@@ -10,7 +10,7 @@ def clipped_linear_schedule(initial_value, min_value=1e-5):
         return max(progress_remaining * initial_value, min_value)
     return schedule
 
-env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, dest_save_file="state4M-2.pkl")
+env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, dest_save_file="state4M-3.pkl")
 check_env(env, warn=True) #optional
 
 model = PPO(
@@ -23,5 +23,5 @@ model = PPO(
     tensorboard_log="./logs"
 )
 model.learn(total_timesteps=TOTAL_STEPS)
-model.save("ppo_walk4M-2")
+model.save("ppo_walk4M-3")
 env.close()
