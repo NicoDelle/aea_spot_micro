@@ -53,12 +53,12 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     env.set_custom_state("previous_gfc", env.agent_ground_feet_contacts)
 
     weights_dict = {
-        "fwd_reward": 5 * fade_in_at(200_000),
-        "deviation_penalty": -2 * fade_in_at(200_000),
+        "fwd_reward": 7 * fade_in_at(200_000),
+        "deviation_penalty": -3 * fade_in_at(200_000),
         "uprightness": 2.5,
-        "height": 1.5,
+        "height": 2.5,
         "contact_bonus": 4,
-        "energy_penalty": -4 * fade_in_at(1_000_000),
+        "energy_penalty": -4.5 * fade_in_at(1_000_000),
         "effort_penalty": -3 * fade_in_at(1_000_000)
     }
 

@@ -17,13 +17,14 @@ def make_env(rank):
             use_gui=False,
             reward_fn=reward_function,
             init_custom_state=init_custom_state,
-            dest_save_file=f"state4M-{rank}.pkl"
+            dest_save_file=f"state4M-6-{rank}.pkl"
         )
         env.seed(100 + rank)
         return env
     return _init
 
 def main():
+    start_time = time.time()
     num_envs = 12
     vec_env = SubprocVecEnv([make_env(rank) for rank in range(num_envs)])
 
@@ -38,12 +39,14 @@ def main():
     )
 
     model.learn(total_timesteps=TOTAL_STEPS)
-    model.save("ppo_walk4M-3-norm")
+    model.save("ppo_walk4M-6")
+
+    end_time = time.time()
+    print(f"\nTraining completed in {end_time - start_time:.2f} seconds.")
     vec_env.close()
 
 if __name__ == '__main__':
     import multiprocessing
+    import time
     multiprocessing.set_start_method('spawn', force=True)  # safe in Docker
     main()
-
-#400k at 11:55
