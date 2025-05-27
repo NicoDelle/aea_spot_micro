@@ -36,7 +36,7 @@ class SpotmicroEnv(gym.Env):
         self._ACT_SPACE_SIZE = 12
         self._MAX_EPISODE_LEN = 3000
         self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
-        self._TARGET_HEIGHT = 0.230
+        self.TARGET_HEIGHT = 0.230
         self._SURVIVAL_REWARD = 15.0
         self._SIM_FREQUENCY = 240
         self._CONTROL_FREQUENCY = 60
@@ -188,6 +188,13 @@ class SpotmicroEnv(gym.Env):
         """
         gf_contacts = self._is_state_initialized("ground_feet_contacts")
         return gf_contacts
+
+    @property
+    def agent_previous_action(self) -> np.ndarray:
+        """
+        Returns the action taken by the agent in the previous step
+        """
+        return self._previous_action
     
     @property
     def target_direction(self) -> np.ndarray:
@@ -264,6 +271,7 @@ class SpotmicroEnv(gym.Env):
         self._agent_state["linear_velocity"] = np.zeros(3)
         self._agent_state["angular_velocity"] = np.zeros(3)
         self._agent_state["ground_feet_contacts"] = set()
+        self._previous_action = np.zeros(self._ACT_SPACE_SIZE, dtype=np.float32)
 
         self._episode_reward_info = []
 
@@ -385,6 +393,7 @@ class SpotmicroEnv(gym.Env):
         if self._action_counter == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY):
             observation = self._step_simulation(action)
             self._action_counter = 0
+            self._previous_action = action.copy()
         else:
             self._action_counter += 1
             observation = self._step_simulation(self._previous_action)
@@ -398,7 +407,6 @@ class SpotmicroEnv(gym.Env):
         if truncated:
             reward += self._SURVIVAL_REWARD
         
-        self._previous_action = action.copy()
         self._total_steps_counter += 1
 
         return observation, reward, terminated, truncated, info
