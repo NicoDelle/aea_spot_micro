@@ -22,11 +22,11 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     # === 0. Effort ===
     effort = 0.0
     for joint in env.motor_joints:
-        effort += abs(joint.effort) / joint.max_torque #normalzing each contributio by max effort
+        effort += abs(joint.effort) / joint.max_torque #normalzing each contribution by max effort
     effort /= len(env.motor_joints) #normalizing by number of joints
 
     # === 1. Forward Progress ===
-    fwd_velocity = np.dot(linear_vel, env._TARGET_DIRECTION)
+    fwd_velocity = np.dot(linear_vel, env.target_direction)
     fwd_reward = np.clip(fwd_velocity, -1, 1)  # m/s, clip for robustness
     deviation_velocity = abs(np.dot(linear_vel, np.array([0,1,0])))
     deviation_penalty = np.clip(deviation_velocity, 0, 1)
@@ -38,15 +38,15 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     upright_reward = np.clip(1.0 - upright_penalty, 0.0, 1.0)
 
     # === 3. Height regulation ===
-    height_target = env._TARGET_HEIGHT
+    height_target = env.TARGET_HEIGHT
     height_error = abs(base_height - height_target)
     height_reward = np.clip(1.0 - height_error / 0.1, 0.0, 1.0)
 
     # === 4. Energy / Smoothness ===
     # Penalize large actions and penalize deviation from previous action
     action_magnitude_penalty = np.linalg.norm(action) / len(action) #Normalizing, since actions are in range -1,1
-    action_diff_penalty = np.linalg.norm(action - env._previous_action) / len(action) #Normalizing, since actions are in range -1,1
-    energy_penalty = action_magnitude_penalty + 0.5 * action_diff_penalty #range: [-1.5,1.5]
+    action_diff_penalty = np.linalg.norm(action - env.agent_previous_action) / len(action) #Normalizing, since actions are in range -1,1
+    energy_penalty = 0.25 * action_magnitude_penalty + 0.75 * action_diff_penalty
 
     # === 5. Contact (optional) ===
     contact_bonus = 0.0
@@ -55,15 +55,18 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     contact_bonus += 1.0 if len(contacts) >= 3 else -0.5
     env.set_custom_state("previous_gfc", env.agent_ground_feet_contacts)
 
+    distance_penalty = np.linalg.norm(np.array([0, 0, base_height]) - env.agent_base_position)
+
     weights_dict = {
-        "fwd_reward": 7 * fade_in_at(200_000),
-        "deviation_penalty": -3 * fade_in_at(200_000),
-        "stillness_reward": 2 * fade_out_at(50_000),
-        "uprightness": 2.5,
-        "height": 2.5,
+        "fwd_reward": 6 * fade_in_at(200_000) * 0,
+        "deviation_penalty": -3 * fade_in_at(200_000) * 0,
+        "stillness_reward": 3,# * fade_out_at(50_000),
+        "uprightness": 2,
+        "height": 6,
         "contact_bonus": 4,
-        "energy_penalty": -4.5 * fade_in_at(1_000_000),
-        "effort_penalty": -3 * fade_in_at(1_000_000)
+        "energy_penalty": -7,#* fade_in_at(1_000_000),
+        "effort_penalty": 0,#* fade_in_at(1_000_000)
+        "distance_penalty": -2
     }
 
     #=== Reward weighting ===
@@ -75,7 +78,8 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
         "height": height_reward,
         "contact_bonus": contact_bonus,
         "energy_penalty": energy_penalty,
-        "effort_penalty": effort
+        "effort_penalty": effort,
+        "distance_penalty": distance_penalty
     }
 
     for k in reward_dict.keys():
