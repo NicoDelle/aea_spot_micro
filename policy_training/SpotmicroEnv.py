@@ -36,7 +36,7 @@ class SpotmicroEnv(gym.Env):
         self._ACT_SPACE_SIZE = 12
         self._MAX_EPISODE_LEN = 3000
         self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
-        self.TARGET_HEIGHT = 0.230
+        self.TARGET_HEIGHT = 0.225
         self._SURVIVAL_REWARD = 15.0
         self._SIM_FREQUENCY = 240
         self._CONTROL_FREQUENCY = 60
@@ -339,7 +339,7 @@ class SpotmicroEnv(gym.Env):
                 pybullet.changeDynamics(
                     self._robot_id,
                     linkIndex=joint.id,
-                    lateralFriction=1.0,
+                    lateralFriction=1.5,
                     physicsClientId=self.physics_client
                 )
 
@@ -390,15 +390,16 @@ class SpotmicroEnv(gym.Env):
                 - info (dict): Contains auxiliary diagnostic information.
         """
         #Slow down the control loop
-        if self._action_counter == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY):
+        if self._action_counter == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY): # apply new action
             observation = self._step_simulation(action)
             self._action_counter = 0
             self._previous_action = action.copy()
-        else:
+            reward, reward_info = self._calculate_reward(action)
+        else:                                                                         # reuse last action
             self._action_counter += 1
             observation = self._step_simulation(self._previous_action)
+            reward, reward_info = self._calculate_reward(self._previous_action)
 
-        reward, reward_info = self._calculate_reward(action)
         terminated = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
         truncated = self._is_terminated()
         info = self._get_info()
