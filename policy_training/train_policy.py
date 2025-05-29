@@ -1,52 +1,27 @@
 from stable_baselines3 import PPO
 from SpotmicroEnv import SpotmicroEnv
-from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.env_checker import check_env
 from reward_function import reward_function, init_custom_state
 
-TOTAL_STEPS = 1_500_000
+TOTAL_STEPS = 4_000_000
 
 def clipped_linear_schedule(initial_value, min_value=1e-5):
     def schedule(progress_remaining):
         return max(progress_remaining * initial_value, min_value)
     return schedule
 
-def make_env(rank):
-    def _init():
-        env = SpotmicroEnv(
-            use_gui=False,
-            reward_fn=reward_function,
-            init_custom_state=init_custom_state,
-            dest_save_file=f"states/state1.5M-4-{rank}.pkl"
-        )
-        env.seed(100 + rank)
-        return env
-    return _init
+env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, init_custom_state=init_custom_state, dest_save_file="state4M-3.pkl")
+check_env(env, warn=True) #optional
 
-def main():
-    start_time = time.time()
-    num_envs = 12
-    vec_env = SubprocVecEnv([make_env(rank) for rank in range(num_envs)])
-
-    model = PPO(
-        "MlpPolicy", 
-        vec_env, 
-        verbose=1, 
-        learning_rate=clipped_linear_schedule(3e-4),
-        ent_coef=0.002,
-        clip_range=0.1,
-        tensorboard_log="./logs"
-    )
-
-    model.learn(total_timesteps=TOTAL_STEPS)
-    model.save("policies/ppo_stand1.5M-4")
-
-    end_time = time.time()
-    print(f"\nTraining completed in {end_time - start_time:.2f} seconds.")
-    vec_env.close()
-
-if __name__ == '__main__':
-    import multiprocessing
-    import time
-    multiprocessing.set_start_method('spawn', force=True)  # safe in Docker
-    main()
+model = PPO(
+    "MlpPolicy", 
+    env, 
+    verbose = 1, 
+    learning_rate=clipped_linear_schedule(3e-4),
+    ent_coef=0.002, #previously 0.0015
+    clip_range=0.1,
+    tensorboard_log="./logs"
+)
+model.learn(total_timesteps=TOTAL_STEPS)
+model.save("ppo_walk4M-3")
+env.close()
