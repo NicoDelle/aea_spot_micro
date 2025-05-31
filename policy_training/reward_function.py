@@ -61,7 +61,7 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     record_bonus = 0
     if env.agent_base_position[0] > env.get_custom_state("record_distance"):
         record_bonus += 1
-        env.set_custom_state("record_distance", env.agent_base_position)
+        env.set_custom_state("record_distance", env.agent_base_position[0])
     #env.set_custom_state("previous_gfc", env.agent_ground_feet_contacts)
     #distance_penalty = np.linalg.norm(np.array([0, 0, base_height]) - env.agent_base_position)
 

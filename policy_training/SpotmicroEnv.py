@@ -400,7 +400,7 @@ class SpotmicroEnv(gym.Env):
             observation = self._step_simulation(self._previous_action)
             reward, reward_info = self._calculate_reward(self._previous_action)
 
-        term_penalty, terminated = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
+        terminated, term_penalty = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
         truncated = self._is_terminated()
         info = self._get_info()
 
