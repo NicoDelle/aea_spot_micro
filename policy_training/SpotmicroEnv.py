@@ -84,7 +84,7 @@ class SpotmicroEnv(gym.Env):
         self._target_state = {
             "min_height": 0.15, #meters?
             "max_height": 0.30,
-            "max_pitchroll": np.radians(55)
+            "max_pitchroll": np.radians(45)
         }
 
         if reward_fn is None:
@@ -339,7 +339,7 @@ class SpotmicroEnv(gym.Env):
                 pybullet.changeDynamics(
                     self._robot_id,
                     linkIndex=joint.id,
-                    lateralFriction=1.5,
+                    lateralFriction=1.25,
                     physicsClientId=self.physics_client
                 )
 
@@ -400,14 +400,16 @@ class SpotmicroEnv(gym.Env):
             observation = self._step_simulation(self._previous_action)
             reward, reward_info = self._calculate_reward(self._previous_action)
 
-        terminated = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
+        term_penalty, terminated = self._is_target_state(self._agent_state) # checks wether the agent has fallen or not
         truncated = self._is_terminated()
         info = self._get_info()
 
         self._episode_reward_info.append(reward_info)
         if truncated:
             reward += self._SURVIVAL_REWARD
-        
+        if terminated:
+            reward += term_penalty
+
         self._total_steps_counter += 1
 
         return observation, reward, terminated, truncated, info
@@ -565,9 +567,9 @@ class SpotmicroEnv(gym.Env):
         return  
 
     #@TODO: discuss the target state and rework this
-    def _is_target_state(self, agent_state) -> bool:
+    def _is_target_state(self, agent_state) -> tuple[bool, int]:
         """
-        Private method that returns wether the state of the agent is a target state (one in which to end the simulation) or not
+        Private method that returns wether the state of the agent is a target state (one in which to end the simulation) or not. It also returns a penalty to apply when the specific target condition is met
         """
 
         base_pos = agent_state["base_position"]
@@ -575,11 +577,11 @@ class SpotmicroEnv(gym.Env):
         height = base_pos[2]
 
         if height <= self._target_state["min_height"] or height > self._target_state["max_height"]:
-            return True
+            return (True, -30)
         elif abs(roll) > self._target_state["max_pitchroll"] or abs(pitch) > self._target_state["max_pitchroll"]:
-            return True
+            return (True, -5)
         else:
-            return False
+            return (False, 0)
     
     def _is_terminated(self) -> bool:
         """

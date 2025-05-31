@@ -3,14 +3,14 @@ from SpotmicroEnv import SpotmicroEnv
 from stable_baselines3.common.env_checker import check_env
 from reward_function import reward_function, init_custom_state
 
-TOTAL_STEPS = 4_000_000
+TOTAL_STEPS = 10_000_000
 
-def clipped_linear_schedule(initial_value, min_value=1e-5):
+def clipped_linear_schedule(initial_value, min_value=5e-5):
     def schedule(progress_remaining):
         return max(progress_remaining * initial_value, min_value)
     return schedule
 
-env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, init_custom_state=init_custom_state, dest_save_file="state4M-3.pkl")
+env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, init_custom_state=init_custom_state, dest_save_file="states/state7M-3.pkl")
 check_env(env, warn=True) #optional
 
 model = PPO(
@@ -23,5 +23,5 @@ model = PPO(
     tensorboard_log="./logs"
 )
 model.learn(total_timesteps=TOTAL_STEPS)
-model.save("ppo_walk4M-3")
+model.save("policies/ppo_walk7M-3")
 env.close()
