@@ -19,24 +19,24 @@ class Joint:
         self.effort = 0
 
         if self.type == "shoulder":
-            self.max_torque = 6.3 #hard limit for all would be 6.81, lowering to see if improves results
+            self.max_torque = 6.8 #hard limit for all would be 6.81, lowering to see if improves results
         elif self.type == "leg":
-            self.max_torque = 6.3
+            self.max_torque = 6.8
         elif self.type == "foot":
-            self.max_torque = 6.3
+            self.max_torque = 6.8
     
     def from_action_to_position(self, action: float) -> float:
         return self.mid + self.range * action
 
 class SpotmicroEnv(gym.Env):
-    def __init__(self, use_gui=False, reward_fn=None, init_custom_state=None, dest_save_file=None, src_save_file=None):
+    def __init__(self, use_gui=False, reward_fn=None, init_custom_state=None, dest_save_file=None, src_save_file=None, writer=None):
         super().__init__()
 
         self._OBS_SPACE_SIZE = 94
         self._ACT_SPACE_SIZE = 12
         self._MAX_EPISODE_LEN = 3000
         self._TARGET_DIRECTION = np.array([1.0, 0.0, 0.0])
-        self.TARGET_HEIGHT = 0.225
+        self.TARGET_HEIGHT = 0.220
         self._SURVIVAL_REWARD = 15.0
         self._SIM_FREQUENCY = 240
         self._CONTROL_FREQUENCY = 60
@@ -55,6 +55,7 @@ class SpotmicroEnv(gym.Env):
         self.np_random = None
 
         self._episode_reward_info = None
+        self.writer = writer
 
         #Declaration of observation and action spaces
         self.observation_space = gym.spaces.Box(
@@ -244,7 +245,6 @@ class SpotmicroEnv(gym.Env):
         """
         self._custom_state[key] = value
 
-    
     def close(self):
         """
         Method exposed and used by SB3.
@@ -392,6 +392,7 @@ class SpotmicroEnv(gym.Env):
         #Slow down the control loop
         if self._action_counter == int(self._SIM_FREQUENCY / self._CONTROL_FREQUENCY): # apply new action
             observation = self._step_simulation(action)
+            self._update_history()
             self._action_counter = 0
             self._previous_action = action.copy()
             reward, reward_info = self._calculate_reward(action)
@@ -434,6 +435,16 @@ class SpotmicroEnv(gym.Env):
         plt.savefig("plot.png")
         plt.close()
     
+    def log_rewards(self, reward_dict: dict):
+        if self.writer is None:
+            return
+        
+        for key, value in reward_dict.items():
+            try:
+                self.writer.add_scalar(f"reward_components/{key}", value, self.num_steps)
+            except Exception as e:
+                print(f"[Logging Error] Could not log {key}: {e}")
+    
     #@TODO: should also tilt the plane, look up the code fromm the notebook
     def _step_simulation(self, action: np.ndarray) -> np.ndarray:
         """
@@ -456,7 +467,6 @@ class SpotmicroEnv(gym.Env):
         pybullet.stepSimulation()
 
         self._update_agent_state()
-        self._update_history()
 
         return self._get_observation()
     

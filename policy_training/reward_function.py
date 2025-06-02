@@ -7,8 +7,9 @@ def init_custom_state(env: SpotmicroEnv) -> None:
     Initialize custom defined state variables for the environment.
     """
     env.set_custom_state("previous_gfc", set())
-    env.set_custom_state("last_x", 0)
-    env.set_custom_state("record_distance", 0)
+    env.set_custom_state("cumulative_forward_distance_bonus", 0)
+    env.set_custom_state("prev_ang_vel", 0)
+    env.set_custom_state("prev_lin_vel", 0)
 
 def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]:
     roll, pitch, _ = pybullet.getEulerFromQuaternion(env.agent_base_orientation)
@@ -33,6 +34,12 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     deviation_penalty = np.clip(deviation_velocity, 0, 1)
     stillness_reward = 1.0 if np.linalg.norm(linear_vel) < 0.05 else 0.0
 
+    linear_accel = linear_vel - env.get_custom_state("prev_lin_vel")
+    angular_accel = angular_vel - env.get_custom_state("prev_ang_vel")
+    env.set_custom_state("prev_lin_vel", linear_vel)
+    env.set_custom_state("prev_ang_vel", angular_vel)
+    acceleration_penalty = 0.5 * np.clip(np.linalg.norm(linear_accel), 0.0, 1.0) + 0.5 * np.clip(np.linalg.norm(angular_accel), 0.0, 1.0)
+
     # === 2. Uprightness (Pitch & Roll) ===
     max_angle = np.radians(45)
     upright_penalty = (abs(roll) + abs(pitch)) / max_angle
@@ -53,34 +60,37 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     contact_bonus = 0.0
     if len(env.get_custom_state("previous_gfc")) >= 3:
         contact_bonus += 0.25
-    contact_bonus += 1.0 if len(contacts) >= 3 else -0.5
-
-    new_distance_traveled = env.agent_base_position[0] - env.get_custom_state("last_x")
-    env.set_custom_state("last_x", env.agent_base_position[0])
+    if len(contacts) >= 3:
+        contact_bonus += 1
+    elif len(contacts) == 2:
+        contact_bonus += 0.5
+    else:
+        contact_bonus -= 0.5
     
-    record_bonus = 0
-    if env.agent_base_position[0] > env.get_custom_state("record_distance"):
-        record_bonus += 1
-        env.set_custom_state("record_distance", env.agent_base_position[0])
+    distance_bonus = 0
+    if env.agent_base_position[0] > env.get_custom_state("cumulative_forward_distance_bonus"):
+        distance_bonus += 1
+        env.set_custom_state("cumulative_forward_distance_bonus", env.agent_base_position[0])
     #env.set_custom_state("previous_gfc", env.agent_ground_feet_contacts)
     #distance_penalty = np.linalg.norm(np.array([0, 0, base_height]) - env.agent_base_position)
 
     weights_dict = {
-        "fwd_reward": 3.5 * fade_in_at(300_000, 1.5),
-        "deviation_penalty": -1.5 * fade_in_at(1_000_000, 1.5),
-        "stillness_reward": 3 * fade_out_at(50_000, 2),
-        "uprightness": 3,
-        "height": 4.5,
-        "contact_bonus": 5.5,
-        "energy_penalty": -3.5 * fade_in_at(300_000, 2),
-        "effort_penalty": -0.75 * fade_in_at(300_000, 1.75),
-        "distance_traveled": 1.5,
-        "record_distance_bonus": 1
+        "fwd_reward": 3 * fade_in_at(150_000, 1.5),
+        "acceleration_penalty": -2.5,
+        "deviation_penalty": -1.75 * fade_in_at(200_000, 1.5),
+        "stillness_reward": 0.5, #* fade_out_at(50_000, 2),
+        "uprightness": 5.5,
+        "height": 3,
+        "contact_bonus": 6,
+        "energy_penalty": -5 * fade_in_at(100_000, 2),
+        "effort_penalty": -3.5 * fade_in_at(100_000, 1.75),
+        "total_distance_bonus": 0.5
     }
 
     #=== Reward weighting ===
     reward_dict = {
         "fwd_reward": fwd_reward,
+        "acceleration_penalty": acceleration_penalty,
         "deviation_penalty": deviation_penalty,
         "stilless_reward": stillness_reward,
         "uprightness": upright_reward,
@@ -88,12 +98,12 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
         "contact_bonus": contact_bonus,
         "energy_penalty": energy_penalty,
         "effort_penalty": effort,
-        "distance_traveled": new_distance_traveled,
-        "record_distance_bonus": record_bonus
+        "total_distance_bonus": distance_bonus
     }
 
     for k in reward_dict.keys():
         if k in weights_dict:
             reward_dict[k] *= weights_dict[k]
+    env.log_rewards(reward_dict=reward_dict)
     total_reward = sum(reward_dict.values())
     return total_reward, reward_dict

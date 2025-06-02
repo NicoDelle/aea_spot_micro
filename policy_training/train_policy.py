@@ -2,6 +2,8 @@ from stable_baselines3 import PPO
 from SpotmicroEnv import SpotmicroEnv
 from stable_baselines3.common.env_checker import check_env
 from reward_function import reward_function, init_custom_state
+from torch.utils.tensorboard import SummaryWriter
+
 
 TOTAL_STEPS = 10_000_000
 
@@ -10,18 +12,22 @@ def clipped_linear_schedule(initial_value, min_value=5e-5):
         return max(progress_remaining * initial_value, min_value)
     return schedule
 
-env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, init_custom_state=init_custom_state, dest_save_file="states/state7M-3.pkl")
+run = "walk10M-4"
+writer = SummaryWriter(log_dir=f"./logs/reward_components/{run}")
+env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, init_custom_state=init_custom_state, dest_save_file=f"states/state{run}.pkl", writer=writer)
 check_env(env, warn=True) #optional
 
 model = PPO(
     "MlpPolicy", 
     env, 
     verbose = 1, 
+    n_steps=2048,
+    batch_size=512,
     learning_rate=clipped_linear_schedule(3e-4),
-    ent_coef=0.002, #previously 0.0015
-    clip_range=0.1,
+    ent_coef=0.0035, #previously 0.0015
+    clip_range=0.15,
     tensorboard_log="./logs"
 )
 model.learn(total_timesteps=TOTAL_STEPS)
-model.save("policies/ppo_walk7M-3")
+model.save(f"policies/ppo_{run}")
 env.close()
