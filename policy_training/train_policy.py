@@ -5,14 +5,14 @@ from reward_function import reward_function, init_custom_state
 from torch.utils.tensorboard import SummaryWriter
 
 
-TOTAL_STEPS = 10_000_000
+TOTAL_STEPS = 9_000_000
 
 def clipped_linear_schedule(initial_value, min_value=5e-5):
     def schedule(progress_remaining):
         return max(progress_remaining * initial_value, min_value)
     return schedule
 
-run = "walk10M-4"
+run = "walk9M-4"
 writer = SummaryWriter(log_dir=f"./logs/reward_components/{run}")
 env = SpotmicroEnv(use_gui=False, reward_fn=reward_function, init_custom_state=init_custom_state, dest_save_file=f"states/state{run}.pkl", writer=writer)
 check_env(env, warn=True) #optional
