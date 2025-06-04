@@ -9,7 +9,5 @@ __pycache__
 spotmicroai.urdf
 policy_training/logs
 *.png
-policies/
-states/
 *.txt
 dockerfile

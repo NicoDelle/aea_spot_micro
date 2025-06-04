@@ -75,15 +75,15 @@ def reward_function(env: SpotmicroEnv, action: np.ndarray) -> tuple[float, dict]
     #distance_penalty = np.linalg.norm(np.array([0, 0, base_height]) - env.agent_base_position)
 
     weights_dict = {
-        "fwd_reward": 3 * fade_in_at(150_000, 1.5),
-        "acceleration_penalty": -2.5,
-        "deviation_penalty": -1.75 * fade_in_at(200_000, 1.5),
+        "fwd_reward": 3.5 * fade_in_at(200_000, 1),
+        "acceleration_penalty": -1.5,
+        "deviation_penalty": -1.5 * fade_in_at(300_000, 1.5),
         "stillness_reward": 0.5, #* fade_out_at(50_000, 2),
-        "uprightness": 5.5,
+        "uprightness": 5,
         "height": 3,
         "contact_bonus": 6,
-        "energy_penalty": -5 * fade_in_at(100_000, 2),
-        "effort_penalty": -3.5 * fade_in_at(100_000, 1.75),
+        "energy_penalty": -3.5 * fade_in_at(200_000, 2),
+        "effort_penalty": -2.5 * fade_in_at(200_000, 1.75),
         "total_distance_bonus": 0.5
     }
 
